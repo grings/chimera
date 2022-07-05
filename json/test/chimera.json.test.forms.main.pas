@@ -5,7 +5,8 @@ interface
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
-  FMX.Controls.Presentation, FMX.ScrollBox, FMX.Memo, FMX.Layouts, FMX.StdCtrls;
+  FMX.Controls.Presentation, FMX.ScrollBox, FMX.Memo, FMX.Layouts, FMX.StdCtrls,
+  FMX.Memo.Types;
 
 type
   TForm1 = class(TForm)
@@ -154,7 +155,7 @@ begin
     sl := TStringList.Create;
     sb := TStringBuilder.Create;
     try
-      sl.Text := txtMsg.AsJSON;
+      sl.Text := txtMsg.AsJSONObject.AsJSON(TWhitespace.sorted);
       sl.SaveToFile('..'+PathDelim+'..'+PathDelim+'Memo.json');
       WriteLn(sl.Text);
       sl.Clear;
