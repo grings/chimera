@@ -30,7 +30,6 @@ package chimera.pubsub.designtime;
 {$IMPLICITBUILD OFF}
 
 requires
-  chimera.pubsub.indy.runtime,
   IndyCore,
   IndyProtocols,
   chimera.pubsub.runtime,
