@@ -27,7 +27,6 @@ type
   public
     class constructor Create;
     class destructor Destroy;
-
     property AsJSON : String read GetAsJSON write SetAsJSON;
     property AsJSONObject : IJSONObject read GetAsJSONObject write SetAsJSONObject;
     property TagJSON : IJSONObject read GetTagJSON write SetTagJSON;
@@ -194,7 +193,8 @@ begin
   ary := cxt.GetType(obj.ClassInfo).GetProperties;
   for prop in ary do
   begin
-    if (prop.IsReadable) and (prop.Visibility = TMemberVisibility.mvPublished) then
+
+    if (prop.IsReadable) and (prop.Visibility = TMemberVisibility.mvPublished) then
     begin
       case RTTITypeToJSONType(prop.PropertyType.TypeKind) of
         TJSONValueType.String:

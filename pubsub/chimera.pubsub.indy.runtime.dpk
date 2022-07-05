@@ -1,5 +1,4 @@
 package chimera.pubsub.indy.runtime;
-
 {$R *.res}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
