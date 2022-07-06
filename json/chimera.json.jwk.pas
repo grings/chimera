@@ -72,6 +72,7 @@ type
     procedure Add(const Name: string; const Value : TDateTime); overload;
     procedure Add(const Name: string; const Value : Boolean); overload;
     function Initialize : TJWK;
+    class function New : TJWK; static;
     function AsJSON : string;
   end;
 
@@ -80,7 +81,13 @@ type
     Data : IJSONObject;
   public
     function Initialize : TJWKSet;
-    procedure Add(jwk : TJWK);
+    class function New : TJWKSet; static;
+    procedure Add(const Name : string; Value : string); overload;
+    procedure Add(const Name: string; const Value : Int64); overload;
+    procedure Add(const Name: string; const Value : Double); overload;
+    procedure Add(const Name: string; const Value : TDateTime); overload;
+    procedure Add(const Name: string; const Value : Boolean); overload;
+    procedure Add(jwk : TJWK); overload;
     function AsJSON : string;
   end;
 
@@ -219,6 +226,11 @@ begin
   Result := Self;
 end;
 
+class function TJWK.New: TJWK;
+begin
+  Result.Initialize;
+end;
+
 procedure TJWK.SetALG(const Value: string);
 begin
   Data.Strings['alg'] := Value;
@@ -321,6 +333,51 @@ begin
   Data.Arrays['keys'].Add(jwk.Data);
 end;
 
+procedure TJWKSet.Add(const Name: string; Value: string);
+var
+  jwk : TJWK;
+begin
+  jwk.Initialize;
+  jwk.Add(Name, Value);
+  Add(jwk);
+end;
+
+procedure TJWKSet.Add(const Name: string; const Value: Int64);
+var
+  jwk : TJWK;
+begin
+  jwk.Initialize;
+  jwk.Add(Name, Value);
+  Add(jwk);
+end;
+
+procedure TJWKSet.Add(const Name: string; const Value: Double);
+var
+  jwk : TJWK;
+begin
+  jwk.Initialize;
+  jwk.Add(Name, Value);
+  Add(jwk);
+end;
+
+procedure TJWKSet.Add(const Name: string; const Value: TDateTime);
+var
+  jwk : TJWK;
+begin
+  jwk.Initialize;
+  jwk.Add(Name, Value);
+  Add(jwk);
+end;
+
+procedure TJWKSet.Add(const Name: string; const Value: Boolean);
+var
+  jwk : TJWK;
+begin
+  jwk.Initialize;
+  jwk.Add(Name, Value);
+  Add(jwk);
+end;
+
 function TJWKSet.AsJSON: string;
 begin
   Result := Data.AsJSON(TWhitespace.compact);
@@ -331,6 +388,11 @@ begin
   Self.Data := JSON;
   Self.Data.Arrays['keys'] := JSONArray;
   result := Self;
+end;
+
+class function TJWKSet.New: TJWKSet;
+begin
+  Result.Initialize;
 end;
 
 end.
