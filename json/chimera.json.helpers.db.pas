@@ -7,11 +7,16 @@ uses System.Classes, chimera.json, Data.DB;
 type
   TDatasetHelper = class helper for TDataset
   private
-    function GetAsJSONArray: IJSONArray;
-  public
-    property AsJSONArray : IJSONArray read GetAsJSONArray;
-    procedure UpdateFields(obj : IJSONObject);
-  end;
+
+    function GetAsJSONArray: IJSONArray;
+
+  public
+
+    property AsJSONArray : IJSONArray read GetAsJSONArray;
+
+    procedure UpdateFields(obj : IJSONObject);
+
+  end;
 
 implementation
 
