@@ -45,24 +45,6 @@ To initialize a new object property, just assign a new empty object to it:
   jso.Objects['attributes'].Strings['brand'] := 'Pepsi';
 ```
 
-Arrays can be added using the TJSONArray helper class:
-
-```
-  jso.Arrays['sales'] := TJSONArray.New;
-  jso.Arrays['sales'].Add(jsoSale); // where jsoSale is another instace of a IJSONObject holding sales data
-```
-	
-Arrays can easily be iterated with the Each property:
-
-```
-  jso.Arrays['sales'].Each(
-    procedure(Sale : IJSONObject)
-	begin
-	  // Do something with the Sale object here
-	end
-  );
-```
-
 JSON can easily be imported and exported to a text file or other stream using the SaveTo and LoadFrom methods:
 ```
   jso.LoadFromFile('sales.json');
@@ -77,6 +59,7 @@ That example also shows off a helper accessor called Dates which automatically c
 | GUIDs[] | TGuid | converts a TGUID to and from a string representation of a guid.|
 | Bytes[] | TArray\<Byte\> | converts a byte array to a base64 encoded binary string.|
 | Dates[] | TDateTime | converts a TDateTime to and from an ISO8601 formatted string|
+| Times[] | TDateTime | converts a TDateTime to and from a simple time string in the format of `h:mm am/pm` |
 | LocalDates[] | TDateTime | converts a TDateTime to and from an ISO8601 formatted string converting from and to UTC.|
 | IntDates[] | TDateTime | converts a TDateTime to and from an integer value representing the number of seconds since January 1st 1970|
 | Items[const idx : integer] | Variant | converts a Delphi variant to and from the closest JSON type that is applicable.|
@@ -98,3 +81,107 @@ Since not all properties or array items may be the same type, Chimera gives you 
 | --- | --- | --- |
 | Types[] | TJSONValueType | a Value that is one of the following `TJSONValueType = (&string, number, &array, &object, boolean, null, code);` |
 
+Arrays can be added using the TJSONArray helper class:
+
+```
+  jso.Arrays['sales'] := TJSONArray.New;
+  jso.Arrays['sales'].Add(jsoSale); // where jsoSale is another instace of a IJSONObject holding sales data
+```
+
+To easily move a Delphi Array into a JSON array, you can use:
+
+```
+  jso.Arrays['strings'] := TJSONArray.From<TArray<string>>(['first','second']);
+  
+```
+	
+You can easily convert a JSON Array to a delphi array using the helper methods:
+```
+    function AsArrayOfStrings : TArray<string>; overload;
+    function AsArrayOfGUIDs : TArray<TGuid>; overload;
+    function AsArrayOfDateTimes : TArray<TDateTime>; overload;
+    function AsArrayOfNumbers : TArray<Double>; overload;
+    function AsArrayOfIntegers : TArray<Int64>; overload;
+    function AsArrayOfBooleans : TArray<Boolean>; overload;
+    function AsArrayOfObjects : TArray<IJSONObject>; overload;
+    function AsArrayOfArrays : TArray<IJSONArray>; overload;
+
+```
+
+Arrays can easily be iterated with the Each property:
+
+```
+  jso.Arrays['sales'].Each(
+    procedure(Sale : IJSONObject)
+	begin
+	  // Do something with the Sale object here
+	end
+  );
+```
+
+## TObjects with JSON ##
+
+Chimera adds some handy Object helpers via the chimera.json.helpers.pas unit. 
+
+You can easily Serialize and Deserialize a TObject descendant by using the new TObject.AsJSONObject property. The following code will take a TEdit named LoginEdit, serialize the object to JSON, alter a property and deserialize back to LoginEdit:
+
+```
+  var jso := LoginEdit.AsJSONOject;
+  jso.Strings['Text'] := 'changed text in json';
+  LoginEdit.AsJSONObject := jso;  
+```
+
+If you'd rather send the json representation of that object straight to text, you can do so with the AsJSON property:
+
+```
+  Memo1.Lines.Text := LoginEdit.AsJSON;
+```
+
+In addition, sometimes it's useful to store complex data or state with an object.  This is now possible using the TObject.TagJSON property.
+
+```
+  TreeNode1.TagJSON := TJSON.FromFile('FirstNode.json');
+```
+
+
+## JWT / JWK
+
+Java Web Tokens and Java Web Keys have been a standard part of several authentication and verification schemes in today's web world.  Instantiating a JWT or JWK is very easy using the chimera.json.jwt.pas and chimera.json.jtk.pas units
+
+JWT:
+
+```
+  var jwt := TJWT.New;
+  jwt.ValidateHS256(sJWTFromWeb, sKnownSecret); // Raises if invalid
+  
+  if not jwt.TryValidateHS256(sJWTFromWeb, sKnownSecret) then // Does not raise if invalid
+    // Do something
+    
+  var myjwt := TJWTNew;
+  Send(myjwt.SignHS224('MySecret');
+  
+```
+
+JWK:
+
+```
+  var jwk := TJWK.New;
+  jwk.Add('param','value');
+  
+  var jwkset := TJWKSet.New;
+  jwkset.Add(jwk);
+  send(jwkset.AsJSON);
+  
+  // or more compactly...
+  var jwkset2 := TJWKSet.New;
+  jwkset2.Add('param','value);
+  send(jwkset2.AsJSON);
+```
+
+## Pubsub ##
+
+The publish / subscribe pattern is very popular in today's web development and design.  Chimera supports working with pubsub in a couple very useful ways.
+
+- An Internal PubSub server implementation can be found in the chimera.pubsub.server unit.  In addition a WebBroker Producer component version is provided int he chimera.pubsub.webbroker unit.
+- A Pubsub client implmentation that supports the internal pubsub server can be found in the chimera.pubsub.client unit.
+- A Pubsub client implementation that is compatible with the Comet/J protocol as used in Faye's Ruby and Node Server in use in hundreds of thousands of implementations worldwide.
