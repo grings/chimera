@@ -121,9 +121,9 @@ Arrays can easily be iterated with the Each property:
   );
 ```
 
-## TObjects with JSON ##
+## Object and Dataset Serialization / Deserialization ##
 
-Chimera adds some handy Object helpers via the chimera.json.helpers.pas unit. 
+Chimera adds some handy Object helpers via the chimera.json.helpers.*.pas units. 
 
 You can easily Serialize and Deserialize a TObject descendant by using the new TObject.AsJSONObject property. The following code will take a TEdit named LoginEdit, serialize the object to JSON, alter a property and deserialize back to LoginEdit:
 
@@ -143,6 +143,21 @@ In addition, sometimes it's useful to store complex data or state with an object
 
 ```
   TreeNode1.TagJSON := TJSON.FromFile('FirstNode.json');
+```
+
+Likewise, datasets can be easily exported AsJSON property
+
+```
+  MyTable.Open;
+  Send(MyTable.AsJSON);
+```
+
+In addition, datasets can be updated by calling UpdateFields with a JSON object repreenting the data to update in the current row.
+
+```  
+  ReceiveRecordToUpdateAsJSON(ID, s);
+  MyTable.Locate('ID', ID);
+  MyTable.UpdateFields(TJSON.From(s));
 ```
 
 
