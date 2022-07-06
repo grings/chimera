@@ -45,24 +45,6 @@ To initialize a new object property, just assign a new empty object to it:
   jso.Objects['attributes'].Strings['brand'] := 'Pepsi';
 ```
 
-Arrays can be added using the TJSONArray helper class:
-
-```
-  jso.Arrays['sales'] := TJSONArray.New;
-  jso.Arrays['sales'].Add(jsoSale); // where jsoSale is another instace of a IJSONObject holding sales data
-```
-	
-Arrays can easily be iterated with the Each property:
-
-```
-  jso.Arrays['sales'].Each(
-    procedure(Sale : IJSONObject)
-	begin
-	  // Do something with the Sale object here
-	end
-  );
-```
-
 JSON can easily be imported and exported to a text file or other stream using the SaveTo and LoadFrom methods:
 ```
   jso.LoadFromFile('sales.json');
@@ -77,6 +59,7 @@ That example also shows off a helper accessor called Dates which automatically c
 | GUIDs[] | TGuid | converts a TGUID to and from a string representation of a guid.|
 | Bytes[] | TArray\<Byte\> | converts a byte array to a base64 encoded binary string.|
 | Dates[] | TDateTime | converts a TDateTime to and from an ISO8601 formatted string|
+| Times[] | TDateTime | converts a TDateTime to and from a simple time string in the format of `h:mm am/pm` |
 | LocalDates[] | TDateTime | converts a TDateTime to and from an ISO8601 formatted string converting from and to UTC.|
 | IntDates[] | TDateTime | converts a TDateTime to and from an integer value representing the number of seconds since January 1st 1970|
 | Items[const idx : integer] | Variant | converts a Delphi variant to and from the closest JSON type that is applicable.|
@@ -97,4 +80,43 @@ Since not all properties or array items may be the same type, Chimera gives you 
 | Name | Type | Description |
 | --- | --- | --- |
 | Types[] | TJSONValueType | a Value that is one of the following `TJSONValueType = (&string, number, &array, &object, boolean, null, code);` |
+
+Arrays can be added using the TJSONArray helper class:
+
+```
+  jso.Arrays['sales'] := TJSONArray.New;
+  jso.Arrays['sales'].Add(jsoSale); // where jsoSale is another instace of a IJSONObject holding sales data
+```
+
+To easily move a Delphi Array into a JSON array, you can use:
+
+```
+  jso.Arrays['strings'] := TJSONArray.From<TArray<string>>(['first','second']);
+  
+```
+	
+You can easily convert a JSON Array to a delphi array using the helper methods:
+```
+    function AsArrayOfStrings : TArray<string>; overload;
+    function AsArrayOfGUIDs : TArray<TGuid>; overload;
+    function AsArrayOfDateTimes : TArray<TDateTime>; overload;
+    function AsArrayOfNumbers : TArray<Double>; overload;
+    function AsArrayOfIntegers : TArray<Int64>; overload;
+    function AsArrayOfBooleans : TArray<Boolean>; overload;
+    function AsArrayOfObjects : TArray<IJSONObject>; overload;
+    function AsArrayOfArrays : TArray<IJSONArray>; overload;
+
+```
+
+Arrays can easily be iterated with the Each property:
+
+```
+  jso.Arrays['sales'].Each(
+    procedure(Sale : IJSONObject)
+	begin
+	  // Do something with the Sale object here
+	end
+  );
+```
+
 
