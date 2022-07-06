@@ -1,4 +1,6 @@
-# TLDR #
+# JSON Chimera for Delphi #
+
+## TLDR ##
 
 Chimera is an Open Source (MIT License) library for modern Delphi releases.  It includes an extremely fast and standard JSON implements as well as utilities useful when working with JSON.
 
