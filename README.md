@@ -119,4 +119,69 @@ Arrays can easily be iterated with the Each property:
   );
 ```
 
+## TObjects with JSON ##
 
+Chimera adds some handy Object helpers via the chimera.json.helpers.pas unit. 
+
+You can easily Serialize and Deserialize a TObject descendant by using the new TObject.AsJSONObject property. The following code will take a TEdit named LoginEdit, serialize the object to JSON, alter a property and deserialize back to LoginEdit:
+
+```
+  var jso := LoginEdit.AsJSONOject;
+  jso.Strings['Text'] := 'changed text in json';
+  LoginEdit.AsJSONObject := jso;  
+```
+
+If you'd rather send the json representation of that object straight to text, you can do so with the AsJSON property:
+
+```
+  Memo1.Lines.Text := LoginEdit.AsJSON;
+```
+
+In addition, sometimes it's useful to store complex data or state with an object.  This is now possible using the TObject.TagJSON property.
+
+```
+  TreeNode1.TagJSON := TJSON.FromFile('FirstNode.json');
+```
+
+
+## JWT / JWK
+
+Java Web Tokens and Java Web Keys have been a standard part of several authentication and verification schemes in today's web world.  Instantiating a JWT or JWK is very easy using the chimera.json.jwt.pas and chimera.json.jtk.pas units
+
+JWT:
+
+```
+  var jwt := TJWT.New;
+  jwt.ValidateHS256(sJWTFromWeb, sKnownSecret); // Raises if invalid
+  
+  if not jwt.TryValidateHS256(sJWTFromWeb, sKnownSecret) then // Does not raise if invalid
+    // Do something
+    
+  var myjwt := TJWTNew;
+  Send(myjwt.SignHS224('MySecret');
+  
+```
+
+JWK:
+
+```
+  var jwk := TJWK.New;
+  jwk.Add('param','value');
+  
+  var jwkset := TJWKSet.New;
+  jwkset.Add(jwk);
+  send(jwkset.AsJSON);
+  
+  // or more compactly...
+  var jwkset2 := TJWKSet.New;
+  jwkset2.Add('param','value);
+  send(jwkset2.AsJSON);
+```
+
+## Pubsub ##
+
+The publish / subscribe pattern is very popular in today's web development and design.  Chimera supports working with pubsub in a couple very useful ways.
+
+- An Internal PubSub server implementation can be found in the chimera.pubsub.server unit.  In addition a WebBroker Producer component version is provided int he chimera.pubsub.webbroker unit.
+- A Pubsub client implmentation that supports the internal pubsub server can be found in the chimera.pubsub.client unit.
+- A Pubsub client implementation that is compatible with the Comet/J protocol as used in Faye's Ruby and Node Server in use in hundreds of thousands of implementations worldwide.
