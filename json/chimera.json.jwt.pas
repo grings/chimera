@@ -73,6 +73,7 @@ type
     function SignHS256(const Secret : string) : string;
     function SignHS384(const Secret : string) : string;
     function SignHS512(const Secret : string) : string;
+    class function New : TJWT; static;
   end;
 
 resourcestring
@@ -171,6 +172,11 @@ begin
     Self.Payload.Data := JSON(Base64Decode(ary[1]));
   end;
   Result := Self;
+end;
+
+class function TJWT.New: TJWT;
+begin
+  Result.Initialize;
 end;
 
 function TJWT.SignHS224(const Secret: string): string;
