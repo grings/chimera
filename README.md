@@ -64,6 +64,7 @@ That example also shows off a helper accessor called Dates which automatically c
 | Times[] | TDateTime | converts a TDateTime to and from a simple time string in the format of `h:mm am/pm` |
 | LocalDates[] | TDateTime | converts a TDateTime to and from an ISO8601 formatted string converting from and to UTC.|
 | IntDates[] | TDateTime | converts a TDateTime to and from an integer value representing the number of seconds since January 1st 1970|
+| Integers[] | Int64 | converts a delphi integer to and from a number value in cases where the value is expected to always be an non-floating point value. |
 | Items[const idx : integer] | Variant | converts a Delphi variant to and from the closest JSON type that is applicable.|
 
 And the standard json types are represented with the following accessors:
@@ -72,7 +73,6 @@ And the standard json types are represented with the following accessors:
 | --- | --- |
 | Strings[] | string
 | Numbers[] | Double
-| Integers[] | Int64
 | Booleans[] | Boolean 
 | Objects[] | IJSONObject
 | Arrays[] | IJSONArray
