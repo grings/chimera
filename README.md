@@ -203,6 +203,27 @@ The publish / subscribe pattern is very popular in today's web development and d
 - A Pubsub client implmentation that supports the internal pubsub server can be found in the chimera.pubsub.client unit.
 - A Pubsub client implementation that is compatible with the Comet/J protocol as used in Faye's Ruby and Node Server in use in hundreds of thousands of implementations worldwide.
 
+## RTL JSON Interop $$
+
+Both the IJSONObject and the IJSONArray have methods to covert a Chimera JSON object to an RTL JSON Object:
+
+```
+  var jso := TJSON.New;
+  var rtlo := jso.CreateRTLObject; // Results in a System.JSON.TJSONObject.  Note that this is a create function and lifetime must be managed on the resulting instance.
+  
+  var jsa := TJSONArray.New;
+  var rtla := jsa.CreateRTLArray; // Results in a System.JSON.TJSONArray. This also is a create function and lifetime must be managed on the resulting instance.
+
+```
+
+Coverting from RTL JSON back to Chimera JSON is simple as well:
+
+```
+  var jsoOut := TJSON.From(rtlo);
+
+  var jsoaOut := TJSONArray.From(rtla);
+```
+
 ## License ##
 
 Copyright 2022, by Jason Southwell
