@@ -430,6 +430,7 @@ type
     class function New : IJSONObject;
     class function From(const src : string = '') : IJSONObject; overload;
     class function From(const Stream : TStream) : IJSONObject; overload;
+    class function From(RTLObject : System.JSON.TJSONObject) : IJSONObject; overload;
     class function FromFile(const Filename : string) : IJSONObject;
 
     class function Format(const src : string; Indent : byte = 3) : string;
@@ -444,6 +445,7 @@ type
     class function New : IJSONArray;
     class function From(const src : string = '') : IJSONArray; overload;
     class function From<T>(const ary : TArray<T>) : IJSONArray; overload;
+    class function From(RTLArray : System.JSON.TJSONArray) : IJSONArray; overload;
   end;
 
 function JSON(const src : string = '') : IJSONObject; deprecated 'Use TJSON.From or TJSON.New instead';
@@ -1108,6 +1110,11 @@ begin
     Result := TParser.Parse(src)
   else
     Result := TJSONObject.Create;
+end;
+
+class function TJSON.From(RTLObject: System.JSON.TJSONObject): IJSONObject;
+begin
+  Result := TJSON.From(RTLObject.ToString);
 end;
 
 function JSONArray(const src : string) : IJSONArray;
@@ -2302,6 +2309,11 @@ begin
     Result := TParser.ParseArray(src)
   else
     Result := TJSONArrayImpl.Create;
+end;
+
+class function TJSONArray.From(RTLArray: System.JSON.TJSONArray): IJSONArray;
+begin
+  Result := TJSONArray.From(RTLArray.ToString);
 end;
 
 class function TJSONArray.From<T>(const ary: TArray<T>): IJSONArray;
@@ -3835,13 +3847,4 @@ begin
     Self.ArrayValue := Value.ArrayValue;
 end;
 
-{ TJSONObject<I> }
-
-{procedure TJSONObject<I>.&With(handler : TProc<I>);
-var
-  vi : TVirtualInterface;
-begin
-
-end;
- }
 end.
