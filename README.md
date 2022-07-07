@@ -71,11 +71,11 @@ And the standard json types are represented with the following accessors:
 
 | Name | Type |
 | --- | --- |
-| Strings[] | string
-| Numbers[] | Double
-| Booleans[] | Boolean 
-| Objects[] | IJSONObject
-| Arrays[] | IJSONArray
+| Strings[] | string |
+| Numbers[] | Double |
+| Booleans[] | Boolean | 
+| Objects[] | IJSONObject |
+| Arrays[] | IJSONArray |
 
 Since not all properties or array items may be the same type, Chimera gives you an accessor specifically to figure out what is in your JSON:
 
