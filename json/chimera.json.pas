@@ -3572,7 +3572,15 @@ begin
   Self.ValueType := TJSONValueType.number;
   Self.NumberValue := Value;
   Self.StringValue := Self.NumberValue.ToString;
-  Self.IntegerValue := Round(Value);
+  try
+    Self.IntegerValue := Round(Value);
+  except
+    try
+      Self.IntegerValue := Trunc(Value);
+    except
+      Self.IntegerValue := 0;
+    end;
+  end;
   Self.ObjectValue := nil;
   Self.ArrayValue := nil;
 end;
