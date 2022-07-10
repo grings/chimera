@@ -137,6 +137,10 @@ begin
 end;
 
 function TParser.GetToken: boolean;
+  function IsLetterOrDigit(c : Char; fmt : TFormatSettings) : boolean; inline;
+  begin
+    Result := (c.IsLetterOrDigit) or (c = '-') or (c = '+') or (c = fmt.DecimalSeparator);
+  end;
 var
   d : Double;
   b : boolean;
@@ -157,39 +161,16 @@ begin
     end else if (FText.Chars[FIndex] <= Char($20)) then
     begin
       continue;
-    end else if (FText.Chars[FIndex].IsLetterOrDigit) or (FText.Chars[FIndex] = '-') or (FText.Chars[FIndex] = '+') then
+    end else if IsLetterOrDigit(FText.Chars[FIndex], FFmt) then
     begin
       // Is an identifier or value
       iStart := FIndex;
-      while (FIndex < FTextLength) do
-      begin
-        if ( not CharInSet(FText.Chars[FIndex], ['0'..'9', 'A'..'Z','a'..'z','.', '-','+'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
-        begin
-          break;
-        end;
-        if (FIndex > iStart) then
-        begin
-          if ( not CharInSet(FText.Chars[FIndex-1], ['0'..'9', 'A'..'Z','a'..'z','.', '-', '+'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
-          begin
-        //if (FIndex > iStart) and (( not TCharacter.isLetterOrDigit(FText[FIndex-1])) and (FText[FIndex-1] <> FFmt.DecimalSeparator)) then
-            break;
-          end;
-          FTmpIdent.Append(FText.Chars[FIndex-1]);
-          FTmpIdent.Append(FText.Chars[FIndex]);
-        end else
-        begin
-          FTmpIdent.Append(FText.Chars[FIndex]);
-        end;
-        inc(FIndex,2); // marginally faster to skip by twos, moreso on big tokens
-      end;
-      if (FIndex > iStart) and ( not CharInSet(FText.Chars[FIndex-1], ['0'..'9', 'A'..'Z','a'..'z','.', '-', '+'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
-      begin
-      //if (FIndex > iStart) and ( not TCharacter.isLetterOrDigit(FText[FIndex-1])) and (FText[FIndex-1] <> FFmt.DecimalSeparator) then
-        dec(FIndex)
-      end else
-      begin
-        FTmpIdent.Append(FText.Chars[FIndex-1]);
-      end;
+      repeat
+        inc(FIndex);
+      until not IsLetterOrDigit(FText.Chars[FIndex], FFmt);
+
+      FTmpIdent.Append(FText.Substring(iStart,FIndex-iStart));
+
       dec(FIndex);
       break;
     end;
