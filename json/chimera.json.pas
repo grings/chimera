@@ -3572,6 +3572,7 @@ begin
   Self.ValueType := TJSONValueType.number;
   Self.NumberValue := Value;
   Self.StringValue := Self.NumberValue.ToString;
+  // This exception chain is necessary to workaround a Delphi bug in Rounding/Truncing Extreme Numbers
   try
     Self.IntegerValue := Round(Value);
   except
@@ -3605,6 +3606,8 @@ begin
 end;
 
 procedure TMultiValue.AsJSON(var result : string; Whitespace : TWhitespace = TWhitespace.Standard);
+var
+  iRounded : Int64;
 begin
   case Self.ValueType of
     TJSONValueType.code:
@@ -3614,11 +3617,24 @@ begin
       Result := Result+'"'+Self.StringValue+'"';
     end;
     TJSONValueType.number:
-      if (Self.NumberValue = Round(Self.NumberValue)) and
+    begin
+      // This exception chain is necessary to workaround a Delphi bug in Rounding/Truncing Extreme Numbers
+      try
+        iRounded := Round(Self.NumberValue);
+      except
+        try
+          iRounded := Trunc(Self.NumberValue)
+        except
+          iRounded := 0;
+        end;
+      end;
+
+      if (Self.NumberValue = iRounded) and
          (Self.NumberValue <> Self.IntegerValue) then
         Result := Result+IntToStr(Self.IntegerValue)
       else
         Result := Result+FloatToStr(Self.NumberValue);
+    end;
     TJSONValueType.array:
     begin
       if Assigned(Self.ArrayValue) then
@@ -3804,6 +3820,8 @@ begin
 end;
 
 procedure TMultiValue.AsJSON(Result: {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard);
+var
+  iRounded : Int64;
 begin
   case Self.ValueType of
     TJSONValueType.code:
@@ -3813,11 +3831,24 @@ begin
       Result.Append('"'+Self.StringValue+'"');
     end;
     TJSONValueType.number:
-      if (Self.NumberValue = Round(Self.NumberValue)) and
+    begin
+      // This exception chain is necessary to workaround a Delphi bug in Rounding/Truncing Extreme Numbers
+      try
+        iRounded := Round(Self.NumberValue);
+      except
+        try
+          iRounded := Trunc(Self.NumberValue);
+        except
+          iRounded := 0;
+        end;
+      end;
+
+      if (Self.NumberValue = iRounded) and
          (Self.NumberValue <> Self.IntegerValue) then
         Result.Append(IntToStr(Self.IntegerValue))
       else
         Result.Append(FloatToStr(Self.NumberValue));
+    end;
     TJSONValueType.array:
     begin
       if Assigned(Self.ArrayValue) then
