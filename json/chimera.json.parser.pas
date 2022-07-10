@@ -28,17 +28,30 @@
 // SOFTWARE.
 //
 // *****************************************************************************
+
 unit chimera.json.parser;
+
 interface
+
 {$I chimera.inc}
-uses System.SysUtils, System.Classes, System.Generics.Collections,
-  System.Types, System.Rtti, chimera.json
+
+uses
+  System.SysUtils,
+  System.Classes,
+  System.Generics.Collections,
+  System.Types,
+  System.Rtti,
+  chimera.json
   {$IFDEF USEFASTCODE}, chimera.FastStringBuilder{$ENDIF};
+
 type
+
 {$SCOPEDENUMS ON}
 {$OVERFLOWCHECKS OFF}
 {$RANGECHECKS OFF}
+
   EChimeraParseException = class(EChimeraException);
+
   TParser = class(TObject)
   type
     TParseToken = (&String, Colon, OpenObject, CloseObject, OpenArray, CloseArray, Comma, EOF, MaxOp, Value);
@@ -69,9 +82,15 @@ type
     class procedure ParseTo(const AText : string; const Obj : IJSONObject);
     class function ParseArray(const AText : string) : IJSONArray; overload;
   end;
+
 implementation
-uses System.Character, System.Variants;
+
+uses
+  System.Character,
+  System.Variants;
+
 { TParser }
+
 constructor TParser.Create;
 begin
   inherited Create;
@@ -81,6 +100,7 @@ begin
   FTmpValue := {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder.Create;
   FTmpIdent := {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder.Create;
 end;
+
 destructor TParser.Destroy;
 begin
   FOperatorStack.Free;
@@ -89,6 +109,7 @@ begin
   FTmpIdent.Free;
   inherited;
 end;
+
 function TParser.OperatorToStr(Token : TParseToken) : string;
 begin
   case Token of
@@ -114,6 +135,7 @@ begin
       Result := 'Value';
   end;
 end;
+
 function TParser.GetToken: boolean;
 var
   d : Double;
@@ -237,6 +259,7 @@ begin
   end;
   Result := False;
 end;
+
 function TParser.ParseArray : IJSONArray;
 begin
   if FToken <> TParseToken.OpenArray  then
@@ -286,11 +309,13 @@ begin
       GetToken;
   end;
 end;
+
 function TParser.ParseObject : IJSONObject;
 begin
   Result := TJSON.New;
   ParseObjectTo(Result);
 end;
+
 procedure TParser.ParseObjectTo(const Obj: IJSONObject);
 var
   sName : String;
@@ -377,6 +402,7 @@ begin
       GetToken;
   end;
 end;
+
 class procedure TParser.ParseTo(const AText: string;
   const Obj: IJSONObject);
 var
@@ -389,6 +415,7 @@ begin
     p.Free;
   end;
 end;
+
 function TParser.Execute(const AText: string): IJSONObject;
   function SimpleJSONValue : IJSONObject;
   begin
@@ -443,6 +470,7 @@ begin
       raise EParserError.Create('Invalid JSON string');
   end;
 end;
+
 function TParser.ExecuteForArray(const AText : string) : IJSONArray;
 begin
   if Trim(AText) = '' then
@@ -457,6 +485,7 @@ begin
     exit;
   Result := ParseArray;
 end;
+
 procedure TParser.ExecuteTo(const AText: string; const Obj: IJSONObject);
 begin
   if Trim(AText) = '' then
@@ -471,6 +500,7 @@ begin
     exit;
   ParseObjectTo(Obj);
 end;
+
 class function TParser.Parse(const AText: string): IJSONObject;
 var
   p : TParser;
@@ -482,6 +512,7 @@ begin
     p.Free;
   end;
 end;
+
 class function TParser.ParseArray(const AText : string) : IJSONArray;
 var
   p : TParser;
@@ -493,5 +524,6 @@ begin
     p.Free;
   end;
 end;
+
 end.
 
