@@ -426,7 +426,11 @@ type
   end;
 
   TJSON = class
+  private
+    class var FMaximumDepth : Cardinal;
   public
+    class constructor Create;
+
     class function New : IJSONObject;
     class function From(const src : string = '') : IJSONObject; overload;
     class function From(const Stream : TStream) : IJSONObject; overload;
@@ -438,6 +442,8 @@ type
     class function Decode(const str : string) : string;
     class function IsJSON(const str : string) : boolean;
     class function ValueToString(t : TJSONValueTYpe) : string;
+
+    class property MaximumDepth : Cardinal read FMaximumDepth write FMaximumDepth;
   end;
 
   TJSONArray = class
@@ -1027,6 +1033,11 @@ end;
 function JSONDecode(const str : string) : string;
 begin
   Result := TJSON.Decode(str);
+end;
+
+class constructor TJSON.Create;
+begin
+  FMaximumDepth := 10000;
 end;
 
 class function TJSON.Decode(const str : string) : string;
