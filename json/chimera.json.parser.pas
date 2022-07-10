@@ -157,19 +157,19 @@ begin
     end else if (FText.Chars[FIndex] <= Char($20)) then
     begin
       continue;
-    end else if (FText.Chars[FIndex].IsLetterOrDigit) or (FText.Chars[FIndex]='-') then
+    end else if (FText.Chars[FIndex].IsLetterOrDigit) or (FText.Chars[FIndex] = '-') or (FText.Chars[FIndex] = '+') then
     begin
       // Is an identifier or value
       iStart := FIndex;
       while (FIndex < FTextLength) do
       begin
-        if ( not CharInSet(FText.Chars[FIndex], ['0'..'9', 'A'..'Z','a'..'z','.', '-'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
+        if ( not CharInSet(FText.Chars[FIndex], ['0'..'9', 'A'..'Z','a'..'z','.', '-','+'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
         begin
           break;
         end;
         if (FIndex > iStart) then
         begin
-          if ( not CharInSet(FText.Chars[FIndex-1], ['0'..'9', 'A'..'Z','a'..'z','.', '-'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
+          if ( not CharInSet(FText.Chars[FIndex-1], ['0'..'9', 'A'..'Z','a'..'z','.', '-', '+'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
           begin
         //if (FIndex > iStart) and (( not TCharacter.isLetterOrDigit(FText[FIndex-1])) and (FText[FIndex-1] <> FFmt.DecimalSeparator)) then
             break;
@@ -182,7 +182,7 @@ begin
         end;
         inc(FIndex,2); // marginally faster to skip by twos, moreso on big tokens
       end;
-      if (FIndex > iStart) and ( not CharInSet(FText.Chars[FIndex-1], ['0'..'9', 'A'..'Z','a'..'z','.', '-'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
+      if (FIndex > iStart) and ( not CharInSet(FText.Chars[FIndex-1], ['0'..'9', 'A'..'Z','a'..'z','.', '-', '+'])) then //.isLetterOrDigit(FText[FIndex])) and (FText[FIndex] <> FFmt.DecimalSeparator)) then
       begin
       //if (FIndex > iStart) and ( not TCharacter.isLetterOrDigit(FText[FIndex-1])) and (FText[FIndex-1] <> FFmt.DecimalSeparator) then
         dec(FIndex)
