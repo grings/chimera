@@ -487,6 +487,11 @@ uses
   System.Rtti,
   System.Hash;
 
+// global since we don't want to add size and initialization time to TMultiValue
+var
+  FFmt : TFormatSettings;
+
+
 function JSONValueTypeToString(t : TJSONValueTYpe) : string;
 begin
   Result := TJSON.ValueToString(t);
@@ -3677,7 +3682,7 @@ begin
   else
     Self.StringValue := Value;
   Self.IntegerValue := StrToIntDef(Self.StringValue, 0);
-  Self.NumberValue := StrToFloatDef(Self.StringValue,0);
+  Self.NumberValue := StrToFloatDef(Self.StringValue,0, FFmt);
   Self.ObjectValue := nil;
   Self.ArrayValue := nil;
 end;
@@ -3967,5 +3972,8 @@ begin
   if Self.ValueTYpe = TJSONValueType.Array then
     Self.ArrayValue := Value.ArrayValue;
 end;
+
+initialization
+  FFmt := TFormatSettings.Create('en-us');
 
 end.
