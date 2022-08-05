@@ -13,7 +13,11 @@ type
   EEOFException = class(Exception) end;
   ESyntaxError = class(Exception) end;
 
-  TTokenType = (ttNULL, ttWhitespace, ttLength, ttIndex, ttLastIndex, ttFirstIndex, ttSlice, ttBracketProperty, ttDeep, ttWildcard, ttProperty, ttRoot);
+  TTokenType = (
+    ttNULL, ttWhitespace, ttLength, ttMin, ttMax, ttAvg, ttStdDev, ttSum, ttKeys,
+    ttConcat, ttAppend, ttFilter, ttIndex, ttLastIndex, ttFirstIndex, ttSlice,
+    ttBracketProperty, ttDeep, ttWildcard, ttProperty, ttRoot);
+
   TToken = record
     Typ : TTokenType;
     Val : String;
@@ -38,6 +42,14 @@ type
     FLookahead : TToken;
     function Eat(const TokenType : TTokenType; BackTick : integer = 0) : TToken;
     function DoLength : IGenerator;
+    function DoMin : IGenerator;
+    function DoMax : IGenerator;
+    function DoAvg : IGenerator;
+    function DoStdDev : IGenerator;
+    function DoKeys : IGenerator;
+    function DoSum : IGenerator;
+    function DoConcat : IGenerator;
+    function DoAppend : IGenerator;
     function DoDeep : IGenerator;
     function DoProperty(FromBracket : Boolean) : IGenerator;
     function DoIndex : IGenerator;
@@ -45,6 +57,7 @@ type
     function DoLastIndex : IGenerator;
     function DoSlice : IGenerator;
     function DoRoot : IGenerator;
+    function DoFilter : IGenerator;
     function _Parse(const Source: string) : IGenerator;
     function Next: IGenerator;
     function DoWildcard: IGenerator;
@@ -67,20 +80,29 @@ type
   end;
 
 const
-  SPEC : array [0..12] of TSpec = (
-    (Reg: '^\s+';                           Typ: ttWHITESPACE),
-    (Reg: '^\.length\(\)';                  Typ: ttLength),
-    (Reg: '^\[(\d+|-\d+)(,(\d+|-\d+))*\]';  Typ: ttINDEX),
-    (Reg: '^\[(\d+|-\d+):\]';               Typ: ttLASTINDEX),
-    (Reg: '^\[:(\d+|-\d+)\]';               Typ: ttFIRSTINDEX),
-    (Reg: '^\[(\d+|-\d+):(\d+|-\d+)\]';     Typ: ttSLICE),
-    (Reg: '^\[''[^"]*''\]';                 Typ: ttBRACKETPROPERTY),
-    (Reg: '^\[\*\]';                        Typ: ttWILDCARD),
-    (Reg: '^\..\*';                         Typ: ttWILDCARD),
-    (Reg: '^\.\*';                          Typ: ttWILDCARD),
-    (Reg: '^\$';                            Typ: ttROOT),
-    (Reg: '^\.\.\w+';                       Typ: ttDEEP),
-    (Reg: '^\.\w+';                         Typ: ttPROPERTY)
+  SPEC : array [0..21] of TSpec = (
+    (Reg: '^\s+';                             Typ: ttWHITESPACE),
+    (Reg: '^\.min\(\)';                       Typ: ttMin),
+    (Reg: '^\.max\(\)';                       Typ: ttMax),
+    (Reg: '^\.avg\(\)';                       Typ: ttAvg),
+    (Reg: '^\.stddev\(\)';                    Typ: ttStdDev),
+    (Reg: '^\.length\(\)';                    Typ: ttLength),
+    (Reg: '^\.sum\(\)';                       Typ: ttSum),
+    (Reg: '^\.keys\(\)';                      Typ: ttKeys),
+    (Reg: '^\.concat\((\d+|''\w+'')\)';       Typ: ttConcat),
+    (Reg: '^\.append\((\d+|''\w+'')\)';       Typ: ttAppend),
+    (Reg: '^\[(\d+|-\d+)(,(\d+|-\d+))*\]';    Typ: ttINDEX),
+    (Reg: '^\[(\d+|-\d+):\]';                 Typ: ttLASTINDEX),
+    (Reg: '^\[:(\d+|-\d+)\]';                 Typ: ttFIRSTINDEX),
+    (Reg: '^\[(\d+|-\d+):(\d+|-\d+)\]';       Typ: ttSLICE),
+    (Reg: '^\[\?\(w+((>|<|>=|<=|=|)\w+)\)\]'; Typ: ttFILTER),
+    (Reg: '^\[''[^"]*''\]';                   Typ: ttBRACKETPROPERTY),
+    (Reg: '^\[\*\]';                          Typ: ttWILDCARD),
+    (Reg: '^\..\*';                           Typ: ttWILDCARD),
+    (Reg: '^\.\*';                            Typ: ttWILDCARD),
+    (Reg: '^\$';                              Typ: ttROOT),
+    (Reg: '^\.\.\w+';                         Typ: ttDEEP),
+    (Reg: '^\.\w+';                           Typ: ttPROPERTY)
   );
 
 { TJPathParser }
@@ -118,6 +140,12 @@ begin
   Result := TIndexGenerator.Create(indexes, Next);
 end;
 
+function TJPathParser.DoKeys: IGenerator;
+begin
+  var Token := Eat(ttLENGTH);
+  Result := TKeysGenerator.Create(Next);
+end;
+
 function TJPathParser.DoLastIndex: IGenerator;
 begin
   var Token := Eat(ttLASTINDEX);
@@ -134,10 +162,48 @@ begin
   Result := TLengthGenerator.Create(Next);
 end;
 
+function TJPathParser.DoAppend: IGenerator;
+begin
+  var Token := Eat(ttLENGTH);
+  Result := TAppendGenerator.Create(Token.Val, Next);
+end;
+
+function TJPathParser.DoAvg: IGenerator;
+begin
+  var Token := Eat(ttLENGTH);
+  Result := TAvgGenerator.Create(Next);
+end;
+
+function TJPathParser.DoConcat: IGenerator;
+begin
+  var Token := Eat(ttLENGTH);
+  Result := TConcatGenerator.Create(Token.Val, Next);
+end;
+
+function TJPathParser.DoMax: IGenerator;
+begin
+  var Token := Eat(ttLENGTH);
+  Result := TMaxGenerator.Create(Next);
+end;
+
+function TJPathParser.DoMin: IGenerator;
+begin
+  var Token := Eat(ttLENGTH);
+  Result := TMinGenerator.Create(Next);
+end;
+
 function TJPathParser.DoDeep: IGenerator;
 begin
   var Token := Eat(ttDEEP);
   Result := TDeepGenerator.Create(Token.Val.Substring(2), Next);
+end;
+
+function TJPathParser.DoFilter: IGenerator;
+begin
+  var Token := Eat(ttFILTER);
+  var s := Token.Val.Substring(3,Token.Val.length-5);
+
+  Result := TFilterGenerator.Create(s, Next);
 end;
 
 function TJPathParser.DoFirstIndex: IGenerator;
@@ -196,6 +262,18 @@ begin
   Result := TSliceGenerator.Create(ary[0].Trim.ToInteger, ary[1].Trim.ToInteger, Next);
 end;
 
+function TJPathParser.DoStdDev: IGenerator;
+begin
+  var Token := Eat(ttLENGTH);
+  Result := TStdDevGenerator.Create(Next);
+end;
+
+function TJPathParser.DoSum: IGenerator;
+begin
+  var Token := Eat(ttLENGTH);
+  Result := TSumGenerator.Create(Next);
+end;
+
 function TJPathParser.Eat(const TokenType: TTokenType; BackTick : integer = 0): TToken;
 begin
   if FLookahead.Typ = ttNULL then
@@ -216,8 +294,26 @@ begin
       Exit(nil);
     ttWhitespace:
       Result := Next;
+    ttMin:
+      Result := DoMin;
+    ttMax:
+      Result := DoMax;
+    ttAvg:
+      Result := DoAvg;
+    ttStdDev:
+      Result := DoStdDev;
     ttLength:
       Result := DoLength;
+    ttKeys:
+      Result := DoKeys;
+    ttSum:
+      Result := DoSum;
+    ttConcat:
+      Result := DoConcat;
+    ttAppend:
+      Result := DoAppend;
+    ttFilter:
+      Result := DoFilter;
     ttIndex:
       Result := DoIndex;
     ttLastIndex:
@@ -341,6 +437,24 @@ begin
       Result := 'WHITESPACE';
     ttLength:
       Result := 'LENGTH';
+    ttMin:
+      Result := 'MIN';
+    ttMax:
+      Result := 'MAX';
+    ttAvg:
+      Result := 'AVG';
+    ttStdDev:
+      Result := 'STDDEV';
+    ttSum:
+      Result := 'SUM';
+    ttKeys:
+      Result := 'KEYS';
+    ttConcat:
+      Result := 'CONCAT';
+    ttAppend:
+      Result := 'APPEND';
+    ttFilter:
+      Result := 'FILTER';
     ttIndex:
       Result := 'INDEX';
     ttLastIndex:

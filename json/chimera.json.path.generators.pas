@@ -34,13 +34,13 @@ type
 
   TRootGenerator = class(TBaseGenerator)
   public
-    constructor Create(const Next : IGenerator); reintroduce; virtual;
+    constructor Create(const Next : IGenerator); override;
     function Process(Value : TMultiValues) : TMultiValues; override;
   end;
 
   TLengthGenerator = class(TBaseGenerator)
   public
-    constructor Create(const Next : IGenerator); reintroduce; virtual;
+    constructor Create(const Next : IGenerator); override;
     function Process(Value : TMultiValues) : TMultiValues; override;
   end;
 
@@ -67,6 +67,15 @@ type
     FToIndex : integer;
   public
     constructor Create(ToIndex : integer; const Next : IGenerator); reintroduce; virtual;
+    function ToString: string; override;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
+  TFilterGenerator = class(TBaseGenerator)
+  private
+    FExpression : string;
+  public
+    constructor Create(const Expression : String; const Next : IGenerator); reintroduce; virtual;
     function ToString: string; override;
     function Process(Value : TMultiValues) : TMultiValues; override;
   end;
@@ -115,7 +124,62 @@ type
     function Process(Value : TMultiValues) : TMultiValues; override;
   end;
 
+  TKeysGenerator = class(TBaseGenerator)
+  public
+    constructor Create(const Next : IGenerator); override;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
+  TMinGenerator = class(TBaseGenerator)
+  public
+    constructor Create(const Next : IGenerator); override;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
+  TMaxGenerator = class(TBaseGenerator)
+  public
+    constructor Create(const Next : IGenerator); override;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
+  TAvgGenerator = class(TBaseGenerator)
+  public
+    constructor Create(const Next : IGenerator); override;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
+  TSumGenerator = class(TBaseGenerator)
+  public
+    constructor Create(const Next : IGenerator); override;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
+  TStdDevGenerator = class(TBaseGenerator)
+  public
+    constructor Create(const Next : IGenerator); override;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
+  TConcatGenerator = class(TBaseGenerator)
+  private
+    FValue : string;
+  public
+    constructor Create(const Value : string; const Next : IGenerator); reintroduce; virtual;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
+  TAppendGenerator = class(TBaseGenerator)
+  private
+    FValue : string;
+  public
+    constructor Create(const Value : string; const Next : IGenerator); reintroduce; virtual;
+    function Process(Value : TMultiValues) : TMultiValues; override;
+  end;
+
 implementation
+
+uses
+  System.Math;
 
 { TBaseGenerator }
 
@@ -819,6 +883,331 @@ begin
     end;
   end;
   Result := ProcessNext(Result);
+end;
+
+{ TFilterGenerator }
+
+constructor TFilterGenerator.Create(const Expression: String;
+  const Next: IGenerator);
+begin
+  inherited Create(Next);
+  FExpression := Expression;
+end;
+
+function TFilterGenerator.Process(Value: TMultiValues): TMultiValues;
+begin
+  Result := Value;
+end;
+
+function TFilterGenerator.ToString: string;
+begin
+  Result := inherited ToString+' ('+FExpression+')';
+end;
+
+{ TKeysGenerator }
+
+constructor TKeysGenerator.Create(const Next: IGenerator);
+begin
+  inherited;
+  FType := 'KEYS()';
+end;
+
+function TKeysGenerator.Process(Value: TMultiValues): TMultiValues;
+var
+  r : TMultiValues;
+begin
+  SetLength(r,0);
+  for var mv in Value do
+  begin
+    if mv.ValueType = TJSONValueType.object then
+    begin
+      mv.ObjectValue.Each(
+        procedure(const Name : string; const Value : PMultiValue)
+        begin
+          SetLength(r, Length(r)+1);
+          r[Length(r)-1] := TMultiValue.Initialize(Name);
+        end
+      );
+    end;
+  end;
+  Result := r;
+end;
+
+function CompareArrays(const L, R : IJSONArray) : integer;
+begin
+  Result := R.Count - L.Count;
+end;
+function CompareObjects(const L, R : IJSONObject) : integer;
+begin
+  Result := L.AsSHA1.CompareTo(R.AsSHA1);
+end;
+function CompareMV(const L, R : TMultiValue) : integer;
+begin
+  if L.ValueType <> R.ValueType then
+  begin
+    case L.ValueType of
+      TJSONValueType.string:
+        if R.ValueType in [TJSONValueType.code] then
+          Result := L.StringValue.CompareTo(R.StringValue)
+        else
+          Result := -1;
+      TJSONValueType.number:
+        if R.ValueType = TJSONValueType.Boolean then
+          if R.NumberValue - L.NumberValue < 0 then
+            Result := -1
+          else if R.NumberValue - L.NumberValue > 0 then
+            Result := 1
+          else
+            Result := 0
+        else
+          Result := 1;
+      TJSONValueType.array:
+        if R.ValueType <> TJSONValueType.Object then
+          Result := 1
+        else
+          Result := -1;
+      TJSONValueType.object:
+        Result := 1;
+      TJSONValueType.boolean:
+        if R.ValueType in [TJSONValueType.number] then
+          if R.NumberValue - L.NumberValue < 0 then
+            Result := -1
+          else if R.NumberValue - L.NumberValue > 0 then
+            Result := 1
+          else
+            Result := 0
+        else
+          Result := -1;
+      TJSONValueType.null:
+        Result := -1;
+      TJSONValueType.code:
+        if R.ValueType in [TJSONValueType.string] then
+          Result := L.StringValue.CompareTo(R.StringValue)
+        else
+          Result := -1;
+    end;
+  end else
+  begin
+    case L.ValueType of
+      TJSONValueType.string:
+        Result := L.StringValue.CompareTo(R.StringValue);
+      TJSONValueType.number:
+        if R.NumberValue - L.NumberValue < 0 then
+          Result := -1
+        else if R.NumberValue - L.NumberValue > 0 then
+          Result := 1
+        else
+          Result := 0;
+      TJSONValueType.array:
+        Result := CompareArrays(L.ArrayValue, R.ArrayValue);
+      TJSONValueType.object:
+        Result := CompareObjects(L.ObjectValue, R.ObjectValue);
+      TJSONValueType.boolean:
+        if R.NumberValue - L.NumberValue < 0 then
+          Result := -1
+        else if R.NumberValue - L.NumberValue > 0 then
+          Result := 1
+        else
+          Result := 0;
+      TJSONValueType.null:
+        Result := 0;
+      TJSONValueType.code:
+        Result := L.StringValue.CompareTo(R.StringValue);
+    end;
+  end;
+end;
+
+
+{ TMinGenerator }
+
+constructor TMinGenerator.Create(const Next: IGenerator);
+begin
+  inherited;
+  FType := 'MIN()';
+end;
+
+function TMinGenerator.Process(Value: TMultiValues): TMultiValues;
+begin
+  SetLength(Result, 0);
+  for var mv in Value do
+  begin
+    if Length(Result) = 0 then
+    begin
+      SetLength(Result,1);
+      Result[0] := mv;
+    end else
+    begin
+      if CompareMV(Result[0], mv) < 0 then
+        Result[0] := mv;
+    end;
+  end;
+end;
+
+{ TMaxGenerator }
+
+constructor TMaxGenerator.Create(const Next: IGenerator);
+begin
+  inherited;
+  FType := 'MAX()';
+end;
+
+function TMaxGenerator.Process(Value: TMultiValues): TMultiValues;
+begin
+  SetLength(Result, 0);
+  for var mv in Value do
+  begin
+    if Length(Result) = 0 then
+    begin
+      SetLength(Result,1);
+      Result[0] := mv;
+    end else
+    begin
+      if CompareMV(Result[0], mv) > 0 then
+        Result[0] := mv;
+    end;
+  end;
+end;
+
+{ TAvgGenerator }
+
+constructor TAvgGenerator.Create(const Next: IGenerator);
+begin
+  inherited;
+  FType := 'AVG()';
+end;
+
+function TAvgGenerator.Process(Value: TMultiValues): TMultiValues;
+var
+  Val : Double;
+begin
+  Val := 0;
+
+  for var mv in Value do
+  begin
+    case mv.ValueType of
+      TJSONValueType.number,
+      TJSONValueType.boolean:
+        Val := Val+mv.NumberValue;
+    end;
+  end;
+  SetLength(Result,1);
+  Result[0] := TMultiValue.Initialize(Val / Length(Value));
+end;
+
+{ TSumGenerator }
+
+constructor TSumGenerator.Create(const Next: IGenerator);
+begin
+  inherited;
+  FType := 'SUM()';
+end;
+
+function TSumGenerator.Process(Value: TMultiValues): TMultiValues;
+var
+  Val : Double;
+begin
+  Val := 0;
+
+  for var mv in Value do
+  begin
+    case mv.ValueType of
+      TJSONValueType.number,
+      TJSONValueType.boolean:
+        Val := Val+mv.NumberValue;
+    end;
+  end;
+  SetLength(Result,1);
+  Result[0] := TMultiValue.Initialize(Val);
+end;
+
+{ TStdDevGenerator }
+
+constructor TStdDevGenerator.Create(const Next: IGenerator);
+begin
+  inherited;
+  FType := 'STDDEV()';
+end;
+
+function TStdDevGenerator.Process(Value: TMultiValues): TMultiValues;
+var
+  Val : TArray<Double>;
+begin
+  setLength(Val, Length(Value));
+
+  for var i := 0 to Length(Value)-1 do
+  begin
+    case Value[i].ValueType of
+      TJSONValueType.number,
+      TJSONValueType.boolean:
+        Val[i] := Value[i].NumberValue;
+      else
+        Val[i] := 0;
+    end;
+  end;
+  SetLength(Result,1);
+  Result[0] := TMultiValue.Initialize(StdDev(Val));
+end;
+
+{ TConcatGenerator }
+
+constructor TConcatGenerator.Create(const Value: string;
+  const Next: IGenerator);
+begin
+  inherited Create(Next);
+  FType := 'CONCAT('+Value+')';
+  FValue := Value;
+end;
+
+function TConcatGenerator.Process(Value: TMultiValues): TMultiValues;
+var
+  s : string;
+begin
+  SetLength(Result, 1);
+
+  s := '';
+  for var mv in Value do
+  begin
+    if s <> '' then
+      s := s + FValue;
+
+    case mv.ValueType of
+      TJSONValueType.string:
+        s := s + mv.StringValue;
+      TJSONValueType.number:
+        s := s + mv.NumberValue.ToString;
+      TJSONValueType.array:
+        s := s + mv.ArrayValue.AsJSON;
+      TJSONValueType.object:
+        s := s + mv.ObjectValue.AsJSON;
+      TJSONValueType.boolean:
+        s := s + mv.NumberValue.ToString;
+      TJSONValueType.null:
+        s := s + 'NULL';
+      TJSONValueType.code:
+        s := s + mv.StringValue;
+    end;
+  end;
+  SetLength(Result,1);
+  Result[0] := TMultiValue.Initialize(s);
+end;
+
+{ TAppendGenerator }
+
+constructor TAppendGenerator.Create(const Value: string;
+  const Next: IGenerator);
+begin
+  inherited Create(Next);
+  FType := 'APPEND('+Value+')';
+  FValue := Value;
+end;
+
+function TAppendGenerator.Process(Value: TMultiValues): TMultiValues;
+var
+  s : string;
+begin
+  Result := Value;
+  SetLength(Result, Length(result)+1);
+  Result[Length(Result)-1] := TMultiValue.Initialize(FValue);
 end;
 
 end.
