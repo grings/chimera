@@ -24,6 +24,9 @@
         <Projects Include="json\test\chimera.json.test.xplatform.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="json\test\jpath\chimera.json.jpath.test.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -95,14 +98,23 @@
     <Target Name="chimera_json_test_xplatform:Make">
         <MSBuild Projects="json\test\chimera.json.test.xplatform.dproj" Targets="Make"/>
     </Target>
+    <Target Name="chimera_json_jpath_test">
+        <MSBuild Projects="json\test\jpath\chimera.json.jpath.test.dproj"/>
+    </Target>
+    <Target Name="chimera_json_jpath_test:Clean">
+        <MSBuild Projects="json\test\jpath\chimera.json.jpath.test.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="chimera_json_jpath_test:Make">
+        <MSBuild Projects="json\test\jpath\chimera.json.jpath.test.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="chimera_utility_runtime;chimera_json_runtime;chimera_pubsub_runtime;chimera_pubsub_webbroker_runtime;chimera_pubsub_designtime;chimera_pubsub_test_xplatform;chimera_json_test_xplatform"/>
+        <CallTarget Targets="chimera_utility_runtime;chimera_json_runtime;chimera_pubsub_runtime;chimera_pubsub_webbroker_runtime;chimera_pubsub_designtime;chimera_pubsub_test_xplatform;chimera_json_test_xplatform;chimera_json_jpath_test"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="chimera_utility_runtime:Clean;chimera_json_runtime:Clean;chimera_pubsub_runtime:Clean;chimera_pubsub_webbroker_runtime:Clean;chimera_pubsub_designtime:Clean;chimera_pubsub_test_xplatform:Clean;chimera_json_test_xplatform:Clean"/>
+        <CallTarget Targets="chimera_utility_runtime:Clean;chimera_json_runtime:Clean;chimera_pubsub_runtime:Clean;chimera_pubsub_webbroker_runtime:Clean;chimera_pubsub_designtime:Clean;chimera_pubsub_test_xplatform:Clean;chimera_json_test_xplatform:Clean;chimera_json_jpath_test:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="chimera_utility_runtime:Make;chimera_json_runtime:Make;chimera_pubsub_runtime:Make;chimera_pubsub_webbroker_runtime:Make;chimera_pubsub_designtime:Make;chimera_pubsub_test_xplatform:Make;chimera_json_test_xplatform:Make"/>
+        <CallTarget Targets="chimera_utility_runtime:Make;chimera_json_runtime:Make;chimera_pubsub_runtime:Make;chimera_pubsub_webbroker_runtime:Make;chimera_pubsub_designtime:Make;chimera_pubsub_test_xplatform:Make;chimera_json_test_xplatform:Make;chimera_json_jpath_test:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

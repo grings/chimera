@@ -35,7 +35,10 @@ interface
 
 {$I chimera.inc}
 
-uses System.SysUtils, System.Classes, System.JSON
+uses
+  System.SysUtils,
+  System.Classes,
+  System.JSON
   {$IFDEF USEFASTCODE}, chimera.FastStringBuilder{$ENDIF};
 
 type
@@ -76,13 +79,14 @@ type
     constructor Initialize(const Value : IJSONArray; encode : boolean = false); overload;
     constructor Initialize(const Value : Variant; encode : boolean = false); overload;
     constructor Initialize(const Value : PMultiValue); overload;
-    function InitializeNull : TMultiValue; inline;
+    class function InitializeNull : TMultiValue; static; inline;
     constructor InitializeCode(const Value : String);
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     function ToVariant : Variant;
   end;
+  TMultiValues = TArray<TMultiValue>;
 
   IJSONArray = interface(IInterface)
     ['{2D496737-5D01-4332-B2C2-7328772E3587}']
@@ -423,6 +427,9 @@ type
 
     function Clone : IJSONObject;
 
+    function Query(const Path : string) : IJSONArray;
+    procedure Update(JQL : string);
+
   end;
 
   TJSON = class
@@ -452,6 +459,7 @@ type
     class function From(const src : string = '') : IJSONArray; overload;
     class function From<T>(const ary : TArray<T>) : IJSONArray; overload;
     class function From(RTLArray : System.JSON.TJSONArray) : IJSONArray; overload;
+    class function From(MVA : TMultiValues) : IJSONArray; overload;
   end;
 
 function JSON(const src : string = '') : IJSONObject; deprecated 'Use TJSON.From or TJSON.New instead';
@@ -471,6 +479,7 @@ uses
   System.Generics.Collections,
   System.Generics.Defaults,
   chimera.json.parser,
+  chimera.json.path,
   System.StrUtils,
   System.DateUtils,
   System.TimeSpan,
@@ -799,6 +808,9 @@ type
 
     function Equals(const obj : IJSONObject) : boolean; reintroduce;
 
+    function Query(const Path : string) : IJSONArray;
+    procedure Update(JQL : string);
+
     property GUIDs[const name : string] : TGuid read GetGuid write SetGuid;
     property Bytes[const name : string] : TArray<Byte> read GetBytes write SetBytes;
     property Strings[const name : string] : string read GetString write SetString;
@@ -832,6 +844,7 @@ type
     function ValueType : TJSONValueType;
     function AsValue : TMultiValue;
 
+    class function From(Value : PMultivalue) : IJSONObject;
     constructor Create; overload; virtual;
     destructor Destroy; override;
   end;
@@ -2327,6 +2340,35 @@ begin
   Result := TJSONArray.From(RTLArray.ToString);
 end;
 
+class function TJSONArray.From(MVA: TMultiValues): IJSONArray;
+var
+  mv: TMultiValue;
+begin
+  Result := TJSONArray.New;
+  for mv in MVA do
+  begin
+    case mv.ValueType of
+      TJSONValueType.string:
+        Result.Add(mv.StringValue);
+      TJSONValueType.number:
+        Result.Add(mv.NumberValue);
+      TJSONValueType.array:
+        Result.Add(mv.ArrayValue);
+      TJSONValueType.object:
+        Result.Add(mv.ObjectValue);
+      TJSONValueType.boolean:
+        if mv.IntegerValue = 0 then
+          Result.Add(False)
+        else
+          Result.Add(True);
+      TJSONValueType.null:
+        Result.AddNull;
+      TJSONValueType.code:
+        Result.AddCode(mv.StringValue);
+    end;
+  end;
+end;
+
 class function TJSONArray.From<T>(const ary: TArray<T>): IJSONArray;
 var
   item : T;
@@ -2787,6 +2829,26 @@ begin
   end;
 end;
 
+class function TJSONObject.From(Value: PMultivalue): IJSONObject;
+var
+  o : TJSONObject;
+begin
+  case Value^.ValueType of
+    TJSONValueType.&object:
+    begin
+      Result := Value^.ObjectValue;
+    end
+
+    else
+    begin
+      o := TJSONObject.Create;
+      o.FSimpleValue := Value^;
+      o.FIsSimpleValue := True;
+      Result := o;
+    end;
+  end;
+end;
+
 procedure TJSONObject.Each(proc: TProcConst<string, IJSONObject>);
 var
   item : TPair<string, PMultiValue>;
@@ -3206,6 +3268,11 @@ begin
     );
 end;
 
+function TJSONObject.Query(const Path: string): IJSONArray;
+begin
+  Result := TJPathParser.Parse(Self, Path);
+end;
+
 procedure TJSONObject.Reload(const Source: string);
 begin
   Clear;
@@ -3550,6 +3617,11 @@ begin
   DoChangeNotify;
 end;
 
+procedure TJSONObject.Update(JQL: string);
+begin
+
+end;
+
 function TJSONObject.ValueType: TJSONValueType;
 begin
   Result := FSimpleValue.ValueType;
@@ -3701,15 +3773,14 @@ begin
   Self.ArrayValue := nil;
 end;
 
-function TMultiValue.InitializeNull : TMultiValue;
+class function TMultiValue.InitializeNull : TMultiValue;
 begin
-  Self.ValueType := TJSONValueType.&null;
-  Self.ObjectValue := nil;
-  Self.ArrayValue := nil;
-  Self.IntegerValue := 0;
-  Self.StringValue := '';
-  Self.NumberValue := 0;
-  Result := Self;
+  Result.ValueType := TJSONValueType.&null;
+  Result.ObjectValue := nil;
+  Result.ArrayValue := nil;
+  Result.IntegerValue := 0;
+  Result.StringValue := '';
+  Result.NumberValue := 0;
 end;
 
 constructor TMultiValue.InitializeCode(const Value: String);
