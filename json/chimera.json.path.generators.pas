@@ -943,6 +943,7 @@ begin
 end;
 function CompareMV(const L, R : TMultiValue) : integer;
 begin
+  result := 0;
   if L.ValueType <> R.ValueType then
   begin
     case L.ValueType of
