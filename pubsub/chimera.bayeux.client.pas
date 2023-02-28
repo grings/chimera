@@ -522,7 +522,7 @@ begin
     FOnLogMessage(msg);
   Result := DoSend;
   if Assigned(FOnLogResponse) then
-    FOnLogResponse(msg);
+    FOnLogResponse(result);
 end;
 
 function TBayeuxClient.GenerateRandomID: string;
