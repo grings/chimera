@@ -2,7 +2,10 @@ unit chimera.json.jwt;
 
 interface
 
-uses System.SysUtils, System.Classes, chimera.json;
+uses
+  System.SysUtils,
+  System.Classes,
+  chimera.json;
 
 type
   EJWTException = class(Exception)
@@ -35,7 +38,6 @@ type
     procedure SetPRN(const Value: string);
     procedure SetJTI(const Value: string);
     procedure SetSUB(const Value: string);
-
   public
     property iss : string read GetISS write SetISS;
     property exp : TDateTime read GetEXP write SetEXP;
@@ -83,7 +85,9 @@ resourcestring
 
 implementation
 
-uses System.NetEncoding, System.Hash;
+uses
+  System.NetEncoding,
+  System.Hash;
 
 function Base64Decode(Data : string) : string; inline;
 var
@@ -182,28 +186,24 @@ end;
 function TJWT.SignHS224(const Secret: string): string;
 begin
   Self.Header.Alg := 'HS224';
-
   Result := AsString+'.'+Base64EncodeAsBytes(THashSHA2.GetHMACAsBytes(TEncoding.UTF8.GetBytes(AsString),TEncoding.UTF8.GetBytes(Secret), THashSHA2.TSHA2Version.SHA224))
 end;
 
 function TJWT.SignHS256(const Secret: string): string;
 begin
   Self.Header.Alg := 'HS256';
-
   Result := AsString+'.'+Base64EncodeAsBytes(THashSHA2.GetHMACAsBytes(TEncoding.UTF8.GetBytes(AsString),TEncoding.UTF8.GetBytes(Secret), THashSHA2.TSHA2Version.SHA256))
 end;
 
 function TJWT.SignHS384(const Secret: string): string;
 begin
   Self.Header.Alg := 'HS384';
-
   Result := AsString+'.'+Base64EncodeAsBytes(THashSHA2.GetHMACAsBytes(TEncoding.UTF8.GetBytes(AsString),TEncoding.UTF8.GetBytes(Secret), THashSHA2.TSHA2Version.SHA384))
 end;
 
 function TJWT.SignHS512(const Secret: string): string;
 begin
   Self.Header.Alg := 'HS512';
-
   Result := AsString+'.'+Base64EncodeAsBytes(THashSHA2.GetHMACAsBytes(TEncoding.UTF8.GetBytes(AsString),TEncoding.UTF8.GetBytes(Secret), THashSHA2.TSHA2Version.SHA512))
 end;
 
@@ -215,7 +215,6 @@ var
 begin
   ary := SplitJWT(JWT, 3);
   sAlg := ValidateHeader(JSON(Base64Decode(ary[0]))).Strings['alg'];
-
   if sAlg = 'HS256' then
     Result := TryValidateHS256(JWT, Secret, jwtResult)
   else if sAlg = 'HS224' then
@@ -230,7 +229,6 @@ begin
     Result := True;
   end else
     raise Exception.Create(S_UNKNOWN_ALGORITHM);
-
 end;
 
 function TJWT.TryValidateHS224(const JWT, Secret: string;
