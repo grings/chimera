@@ -180,6 +180,7 @@ type
     procedure DoChangeNotify;
 
     function Equals(const obj : IJSONArray) : boolean;
+    function IsEmpty : boolean;
 
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
@@ -363,6 +364,8 @@ type
     procedure BeginUpdates;
     procedure EndUpdates;
     procedure DoChangeNotify;
+
+    function IsEmpty : boolean;
 
     function Equals(const obj : IJSONObject) : boolean;
     function LoadFromStream(const Name : String; Stream : TStream; Encode : boolean) : IJSONObject; overload;
@@ -596,6 +599,8 @@ type
     function AsArrayOfObjects : TArray<IJSONObject>; overload;
     function AsArrayOfArrays : TArray<IJSONArray>; overload;
 
+    function IsEmpty : boolean;
+
     procedure Each(proc : TProcConst<TGuid>); overload;
     procedure Each(proc : TProcConst<TDateTime>); overload;
     procedure Each(proc : TProcConst<string>); overload;
@@ -786,6 +791,8 @@ type
     procedure Add(const name : string; const value : TArray<Byte>); overload;
     procedure AddNull(const name : string);
     procedure AddCode(const name : string; const value : string);
+
+    function IsEmpty : boolean;
 
     procedure Merge(const &object : IJSONObject; OnDuplicate : TDuplicateHandler = nil);
     function SameAs(CompareTo : IJSONObject) : boolean;
@@ -1818,6 +1825,11 @@ begin
       break;
     end;
   end;
+end;
+
+function TJSONArrayImpl.IsEmpty: boolean;
+begin
+  Result := FValues.Count = 0;
 end;
 
 function TJSONArrayImpl.LoadFromStream(idx: integer; Stream: TStream;
@@ -3145,6 +3157,11 @@ begin
     result := FValues[name]
   else
     raise EChimeraJSONException.Create('Object is missing the "'+name+'" property.');
+end;
+
+function TJSONObject.IsEmpty: boolean;
+begin
+  Result := FIsSimpleValue and (FSimpleValue.ValueType = TJSONValueType.null) or (FValues.Count = 0);
 end;
 
 function TJSONObject.IsSimpleValue: boolean;
