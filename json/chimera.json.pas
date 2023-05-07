@@ -79,7 +79,8 @@ type
     constructor Initialize(const Value : IJSONArray; encode : boolean = false); overload;
     constructor Initialize(const Value : Variant; encode : boolean = false); overload;
     constructor Initialize(const Value : PMultiValue); overload;
-    class function InitializeNull : TMultiValue; static; inline;
+    class function InitializeNull : TMultiValue; static; //inline;
+    procedure ClearToNull;
     constructor InitializeCode(const Value : String);
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
@@ -179,6 +180,7 @@ type
     procedure DoChangeNotify;
 
     function Equals(const obj : IJSONArray) : boolean;
+    function IsEmpty : boolean;
 
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
@@ -362,6 +364,8 @@ type
     procedure BeginUpdates;
     procedure EndUpdates;
     procedure DoChangeNotify;
+
+    function IsEmpty : boolean;
 
     function Equals(const obj : IJSONObject) : boolean;
     function LoadFromStream(const Name : String; Stream : TStream; Encode : boolean) : IJSONObject; overload;
@@ -595,6 +599,8 @@ type
     function AsArrayOfObjects : TArray<IJSONObject>; overload;
     function AsArrayOfArrays : TArray<IJSONArray>; overload;
 
+    function IsEmpty : boolean;
+
     procedure Each(proc : TProcConst<TGuid>); overload;
     procedure Each(proc : TProcConst<TDateTime>); overload;
     procedure Each(proc : TProcConst<string>); overload;
@@ -785,6 +791,8 @@ type
     procedure Add(const name : string; const value : TArray<Byte>); overload;
     procedure AddNull(const name : string);
     procedure AddCode(const name : string; const value : string);
+
+    function IsEmpty : boolean;
 
     procedure Merge(const &object : IJSONObject; OnDuplicate : TDuplicateHandler = nil);
     function SameAs(CompareTo : IJSONObject) : boolean;
@@ -1223,7 +1231,7 @@ var
   pmv : PMultiValue;
 begin
   New(pmv);
-  pmv.InitializeNull;
+  pmv.ClearToNull;
   FValues.Add(pmv);
 end;
 
@@ -1488,7 +1496,7 @@ begin
   while FValues.Count <= idx do
   begin
     New(pmv);
-    pmv.InitializeNull;
+    pmv.ClearToNull;
     FValues.Add(pmv);
   end;
 end;
@@ -1817,6 +1825,11 @@ begin
       break;
     end;
   end;
+end;
+
+function TJSONArrayImpl.IsEmpty: boolean;
+begin
+  Result := FValues.Count = 0;
 end;
 
 function TJSONArrayImpl.LoadFromStream(idx: integer; Stream: TStream;
@@ -2280,7 +2293,7 @@ begin
       TJSONValueType.boolean:
         FValues.Items[idx].Initialize(False);
       TJSONValueType.null:
-        FValues.Items[idx].InitializeNull;
+        FValues.Items[idx].ClearToNull;
     end;
     DoChangeNotify;
   end;
@@ -2450,7 +2463,7 @@ var
   pmv : PMultiValue;
 begin
   New(pmv);
-  pmv.InitializeNull;
+  pmv.ClearToNull;
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
 end;
@@ -3146,6 +3159,11 @@ begin
     raise EChimeraJSONException.Create('Object is missing the "'+name+'" property.');
 end;
 
+function TJSONObject.IsEmpty: boolean;
+begin
+  Result := FIsSimpleValue and (FSimpleValue.ValueType = TJSONValueType.null) or (FValues.Count = 0);
+end;
+
 function TJSONObject.IsSimpleValue: boolean;
 begin
   Result := FIsSimpleValue;
@@ -3513,7 +3531,7 @@ procedure TJSONObject.SetIsNull(const Value: boolean);
 begin
   FIsSimpleValue := True;
   Clear;
-  FSimpleValue.InitializeNull;
+  FSimpleValue.ClearToNull;
 end;
 
 procedure TJSONObject.SetItem(const name: string; const Value: Variant);
@@ -3786,6 +3804,16 @@ begin
   Result.IntegerValue := 0;
   Result.StringValue := '';
   Result.NumberValue := 0;
+end;
+
+procedure TMultiValue.ClearToNull;
+begin
+  ValueType := TJSONValueType.&null;
+  ObjectValue := nil;
+  ArrayValue := nil;
+  IntegerValue := 0;
+  StringValue := '';
+  NumberValue := 0;
 end;
 
 constructor TMultiValue.InitializeCode(const Value: String);
