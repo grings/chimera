@@ -79,7 +79,8 @@ type
     constructor Initialize(const Value : IJSONArray; encode : boolean = false); overload;
     constructor Initialize(const Value : Variant; encode : boolean = false); overload;
     constructor Initialize(const Value : PMultiValue); overload;
-    class function InitializeNull : TMultiValue; static; inline;
+    class function InitializeNull : TMultiValue; static; //inline;
+    procedure ClearToNull;
     constructor InitializeCode(const Value : String);
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
@@ -1223,7 +1224,7 @@ var
   pmv : PMultiValue;
 begin
   New(pmv);
-  pmv.InitializeNull;
+  pmv.ClearToNull;
   FValues.Add(pmv);
 end;
 
@@ -1488,7 +1489,7 @@ begin
   while FValues.Count <= idx do
   begin
     New(pmv);
-    pmv.InitializeNull;
+    pmv.ClearToNull;
     FValues.Add(pmv);
   end;
 end;
@@ -2280,7 +2281,7 @@ begin
       TJSONValueType.boolean:
         FValues.Items[idx].Initialize(False);
       TJSONValueType.null:
-        FValues.Items[idx].InitializeNull;
+        FValues.Items[idx].ClearToNull;
     end;
     DoChangeNotify;
   end;
@@ -2450,7 +2451,7 @@ var
   pmv : PMultiValue;
 begin
   New(pmv);
-  pmv.InitializeNull;
+  pmv.ClearToNull;
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
 end;
@@ -3513,7 +3514,7 @@ procedure TJSONObject.SetIsNull(const Value: boolean);
 begin
   FIsSimpleValue := True;
   Clear;
-  FSimpleValue.InitializeNull;
+  FSimpleValue.ClearToNull;
 end;
 
 procedure TJSONObject.SetItem(const name: string; const Value: Variant);
@@ -3786,6 +3787,16 @@ begin
   Result.IntegerValue := 0;
   Result.StringValue := '';
   Result.NumberValue := 0;
+end;
+
+procedure TMultiValue.ClearToNull;
+begin
+  ValueType := TJSONValueType.&null;
+  ObjectValue := nil;
+  ArrayValue := nil;
+  IntegerValue := 0;
+  StringValue := '';
+  NumberValue := 0;
 end;
 
 constructor TMultiValue.InitializeCode(const Value: String);

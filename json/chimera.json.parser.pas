@@ -231,7 +231,7 @@ begin
         else if TryStrToBool(sVal,b) then
           FTokenValue.Initialize(b)
         else if sVal = 'null' then
-          FTokenValue.InitializeNull
+          FTokenValue.ClearToNull
         else
           raise EChimeraParseException.Create('Unexpected Value "'+sVal+'"');
       end;
