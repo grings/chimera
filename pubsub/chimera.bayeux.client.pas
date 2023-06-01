@@ -913,6 +913,8 @@ end;
 
 procedure TBayeuxClient.Subscribe(const Channel: string;
   const OnMessage: TMessageHandler);
+var
+  LHTTP: THTTPClient;
 begin
   FDispatcherCS.BeginWrite;
   try
@@ -938,6 +940,28 @@ begin
       SendMessage(jso,
         procedure(const channel, error : string)
         begin
+          if (error.startsWith('401::') and (error.toUpper.Contains('UNKNOWN CLIENT'))) then
+          begin
+            //if UNKNOWN CLIENT, unsubscribe, clear out client id, initiate a new handshake to get new client id, and then subscribe using this new client id
+            Unsubscribe(Channel);
+            ClientId := '';
+            LHTTP := THTTPClient.Create;
+            try
+              SetupHTTP(LHTTP);
+              if Handshake(LHTTP) then
+              begin
+                jso.Strings['clientId'] := ClientID; //new clientid
+                SendMessage(jso, procedure(const channel, error: string)
+                begin
+                  Unsubscribe(Channel);
+                  DoLogVerbose('Error trying to subscribe to channel '+channel+' after retrying handshake to get new client id: '+error);
+                end)
+              end;
+            finally
+              LHTTP.Free;
+            end;
+          end
+          else
           if (not error.startsWith('401::')) or
              (error.startsWith('401::') and (not error.toUpper.Contains('UNKNOWN CLIENT'))) then
             Unsubscribe(Channel);
