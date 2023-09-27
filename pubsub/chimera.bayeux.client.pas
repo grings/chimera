@@ -940,7 +940,8 @@ begin
       SendMessage(jso,
         procedure(const channel, error : string)
         begin
-          if (error.startsWith('401::') and (error.toUpper.Contains('UNKNOWN CLIENT'))) then
+          DoLogVerbose('[TBayeuxClient.Subscribe] SendMessage(..., procedure): Channel: '+channel+' Error: '+error);
+          if (error.startsWith('401:') and (error.toUpper.Contains('UNKNOWN CLIENT'))) then
           begin
             //if UNKNOWN CLIENT, unsubscribe, clear out client id, initiate a new handshake to get new client id, and then subscribe using this new client id
             Unsubscribe(Channel);
@@ -962,8 +963,8 @@ begin
             end;
           end
           else
-          if (not error.startsWith('401::')) or
-             (error.startsWith('401::') and (not error.toUpper.Contains('UNKNOWN CLIENT'))) then
+          if (not error.startsWith('401:')) or
+             (error.startsWith('401:') and (not error.toUpper.Contains('UNKNOWN CLIENT'))) then
             Unsubscribe(Channel);
         end
       );
