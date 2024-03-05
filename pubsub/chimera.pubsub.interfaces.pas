@@ -23,8 +23,6 @@ type
       property Name : string read GetName;
   end;
 
-
-
 implementation
 
 end.
