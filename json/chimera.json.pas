@@ -57,6 +57,8 @@ type
   TDuplicateResolution = (Skip, Overwrite);
   TDuplicateHandler = reference to function(const prop : string) : TDuplicateResolution;
 
+  TScanMatchHandler<T> = reference to procedure(const prop : string; var Value : T);
+
   EChimeraException = class(Exception);
 
   EChimeraJSONException = class(EChimeraException);
@@ -88,6 +90,8 @@ type
     function ToVariant : Variant;
   end;
   TMultiValues = TArray<TMultiValue>;
+
+  TMVScanMatchHandler = reference to procedure(const Target : IJSONObject; const prop : string; const Value : PMultiValue);
 
   IJSONArray = interface(IInterface)
     ['{2D496737-5D01-4332-B2C2-7328772E3587}']
@@ -186,6 +190,9 @@ type
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     function CreateRTLArray : System.JSON.TJSONArray;
+
+    procedure DeepScan(const PropertyName : string; const OnScanMatch : TMVScanMatchHandler); overload;
+    procedure DeepScan(const PropertyNames : TArray<string>; const OnScanMatch : TMVScanMatchHandler); overload;
 
     function LoadFromStream(idx : integer; Stream : TStream; Encode : boolean) : IJSONObject; overload;
     function LoadFromStream(Stream : TStream; Encode : boolean) : IJSONObject; overload;
@@ -357,6 +364,28 @@ type
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     function CreateRTLObject : System.JSON.TJSONObject;
+
+    procedure DeepScan(PropertyName : string; OnScanMatch : TMVScanMatchHandler); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TMVScanMatchHandler); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<String>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<String>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<Double>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<Double>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<Int64>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<Int64>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<Boolean>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<Boolean>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<TArray<Byte>>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<TArray<Byte>>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<TGUID>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<TGUID>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<TDateTime>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<TDateTime>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<IJSONObject>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<IJSONObject>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<IJSONArray>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<IJSONArray>); overload;
+
 
     procedure Reload(const Source : string);
     procedure Clear;
@@ -585,6 +614,9 @@ type
     procedure Remove(const value : PMultiValue); overload;
     property Raw[const idx: integer] : PMultiValue read GetRaw write SetRaw;
 
+    procedure DeepScan(const PropertyName : string; const OnScanMatch : TMVScanMatchHandler); overload;
+    procedure DeepScan(const PropertyNames : TArray<string>; const OnScanMatch : TMVScanMatchHandler); overload;
+
     function LoadFromStream(idx : integer; Stream : TStream; Encode : boolean) : IJSONObject; overload;
     function LoadFromStream(Stream : TStream; Encode : boolean) : IJSONObject; overload;
     procedure SaveToStream(Stream: TStream; Decode : boolean); overload;
@@ -766,6 +798,7 @@ type
     procedure SetAsNumber(const Value: Double);
     procedure SetAsString(const Value: string);
 
+
   public  // IJSONObject
     procedure Each(proc : TProcConst<string, PMultiValue>); overload;
     procedure Add(const name : string; const value : PMultiValue); overload;
@@ -793,6 +826,28 @@ type
     procedure AddCode(const name : string; const value : string);
 
     function IsEmpty : boolean;
+
+    procedure DeepScan(PropertyName : string; OnScanMatch : TMVScanMatchHandler); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TMVScanMatchHandler); overload;
+
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<String>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<String>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<Double>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<Double>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<Int64>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<Int64>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<Boolean>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<Boolean>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<TArray<Byte>>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<TArray<Byte>>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<TGUID>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<TGUID>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<TDateTime>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<TDateTime>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<IJSONObject>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<IJSONObject>); overload;
+    procedure DeepScan(PropertyName : string; OnScanMatch : TScanMatchHandler<IJSONArray>); overload;
+    procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TScanMatchHandler<IJSONArray>); overload;
 
     procedure Merge(const &object : IJSONObject; OnDuplicate : TDuplicateHandler = nil);
     function SameAs(CompareTo : IJSONObject) : boolean;
@@ -2093,6 +2148,36 @@ begin
   end;
 end;
 
+procedure TJSONArrayImpl.DeepScan(const PropertyNames: TArray<string>;
+  const OnScanMatch: TMVScanMatchHandler);
+begin
+  for var va in FValues do
+  begin
+    if va^.ValueType = TJSONValueType.Object then
+    begin
+      if Assigned(va^.ObjectValue) then
+        va^.ObjectValue.DeepScan(PropertyNames, OnScanMatch);
+    end else if va^.ValueType = TJSONValueType.Array then
+      if Assigned(va^.ArrayValue) then
+        va^.ArrayValue.DeepScan(PropertyNames, OnScanMatch);
+  end;
+end;
+
+procedure TJSONArrayImpl.DeepScan(const PropertyName: string;
+  const OnScanMatch: TMVScanMatchHandler);
+begin
+  for var va in FValues do
+  begin
+    if va^.ValueType = TJSONValueType.Object then
+    begin
+      if Assigned(va^.ObjectValue) then
+        va^.ObjectValue.DeepScan(PropertyName, OnScanMatch);
+    end else if va^.ValueType = TJSONValueType.Array then
+      if Assigned(va^.ArrayValue) then
+        va^.ArrayValue.DeepScan(PropertyName, OnScanMatch);
+  end;
+end;
+
 procedure TJSONArrayImpl.Delete(const idx: Integer);
 begin
   Dispose(FValues[idx]);
@@ -2740,6 +2825,256 @@ end;
 function TJSONObject.CreateRTLObject: System.JSON.TJSONObject;
 begin
   Result := System.JSON.TJSONObject(System.JSON.TJSONObject.ParseJSONValue(TEncoding.UTF8.GetBytes(AsJSON),0));
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TMVScanMatchHandler);
+begin
+  for var v in FValues do
+  begin
+    if v.Key = PropertyName then
+      OnScanMatch(Self, v.Key, v.Value);
+    if v.Value^.ValueType = TJSONValueType.Object then
+    begin
+      if Assigned(v.Value^.ObjectValue) then
+        v.Value^.ObjectValue.DeepScan(PropertyName, OnScanMatch);
+    end else if v.Value^.ValueType = TJSONValueType.array then
+    begin
+      if Assigned(v.Value^.ArrayValue) then
+      begin
+        v.Value^.ArrayValue.DeepScan(PropertyName, OnScanMatch);
+      end;
+    end;
+  end;
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TMVScanMatchHandler);
+begin
+  if Length(PropertyNames) < FValues.Count then
+  begin
+    for var p in PropertyNames do
+      DeepScan(p, OnScanMatch);
+  end else
+  begin
+    for var v in FValues do
+    begin
+      for var sProp in PropertyNames do
+        if v.Key = sProp then
+          OnScanMatch(Self, v.Key, v.Value);
+      if v.Value^.ValueType = TJSONValueType.Object then
+      begin
+        if Assigned(v.Value^.ObjectValue) then
+          v.Value^.ObjectValue.DeepScan(PropertyNames, OnScanMatch);
+      end else if v.Value^.ValueType = TJSONValueType.array then
+      begin
+        if Assigned(v.Value^.ArrayValue) then
+        begin
+          v.Value^.ArrayValue.DeepScan(PropertyNames, OnScanMatch);
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<Boolean>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<Boolean>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      bValue : Boolean;
+    begin
+      bValue := Value^.IntegerValue <> 0;
+      OnScanMatch(PropertyName, bValue);
+      if bValue <> (Value^.IntegerValue <> 0) then
+        Target.Booleans[PropertyName] := bValue;
+    end
+  );
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<TArray<Byte>>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<TArray<Byte>>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      aryValue : TArray<Byte>;
+    begin
+      aryValue := TNetEncoding.Base64.Decode(TEncoding.UTF8.GetBytes(Value^.StringValue));
+      OnScanMatch(PropertyName, aryValue);
+      Target.Bytes[PropertyName] := aryValue;
+    end
+  );
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<Int64>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<Int64>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      iValue : Int64;
+    begin
+      iValue := Value^.IntegerValue;
+      OnScanMatch(PropertyName, iValue);
+      if iValue <> Value^.IntegerValue then
+        Target.Integers[PropertyName] := iValue;
+    end
+  );
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<String>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<String>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      sValue : string;
+    begin
+      sValue := Value^.StringValue;
+      OnScanMatch(PropertyName, sValue);
+      if sValue <> Value^.StringValue then
+        Target.Strings[PropertyName] := sValue;
+    end
+  );
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<Double>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<Double>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      dValue : Double;
+    begin
+      dValue := Value^.NumberValue;
+      OnScanMatch(PropertyName, dValue);
+      if dValue <> Value^.NumberValue then
+        Target.Numbers[PropertyName] := dValue;
+    end
+  );
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<IJSONObject>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<IJSONObject>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      oValue : IJSONObject;
+    begin
+      oValue := Value^.ObjectValue;
+      OnScanMatch(PropertyName, oValue);
+      if oValue <> Value^.ObjectValue then
+        Target.Objects[PropertyName] := oValue;
+    end
+  );
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<IJSONArray>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<IJSONArray>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      aryValue : IJSONArray;
+    begin
+      aryValue := Value^.ArrayValue;
+      OnScanMatch(PropertyName, aryValue);
+      if aryValue <> Value^.ArrayValue then
+        Target.Arrays[PropertyName] := aryValue;
+    end
+  );
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<TGUID>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<TGUID>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      uuValue : TGUID;
+    begin
+      uuValue := StringToGuid(Value^.StringValue);
+      OnScanMatch(PropertyName, uuValue);
+      if uuValue <> StringToGuid(Value^.StringValue) then
+        Target.GUIDS[PropertyName] := uuValue;
+    end
+  );
+end;
+
+procedure TJSONObject.DeepScan(PropertyName: string;
+  OnScanMatch: TScanMatchHandler<TDateTime>);
+begin
+  DeepScan([PropertyName], OnScanMatch);
+end;
+
+procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
+  OnScanMatch: TScanMatchHandler<TDateTime>);
+begin
+  DeepScan(PropertyNames,
+    procedure(const Target : IJSONObject; const PropertyName : string; const Value : PMultiValue)
+    var
+      dtValue : TDateTime;
+    begin
+      if (Value^.ValueType = TJSONValueType.&string) and
+         TryISO8601ToDate(Value^.StringValue,dtValue) then
+      begin
+        OnScanMatch(PropertyName, dtValue);
+        if dtValue <> ISO8601ToDate(Value^.StringValue) then
+          Target.Dates[PropertyName] := dtValue;
+      end;
+    end
+  );
 end;
 
 destructor TJSONObject.Destroy;
