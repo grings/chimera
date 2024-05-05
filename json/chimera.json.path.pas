@@ -3,8 +3,13 @@ unit chimera.json.path;
 interface
 
 uses
+  {$IFDEF FPC}
+  SysUtils,
+  Classes,
+  {$ELSE}
   System.SysUtils,
   System.Classes,
+  {$ENDIF}
   System.RegularExpressions,
   chimera.json.path.generators,
   chimera.json;
@@ -108,10 +113,13 @@ const
 { TJPathParser }
 
 class function TJPathParser.AST(const Source: string): string;
+var
+  jpp : TJPathParser;
+  gen : IGenerator;
 begin
-  var jpp := TJPathParser.Create;
+  jpp := TJPathParser.Create;
   try
-    var gen := jpp._Parse(Source);
+    gen := jpp._Parse(Source);
     if gen.&Type <> 'ROOT' then
       raise Exception.Create('Path does not start with root.');
     Result := gen.AST;
@@ -127,91 +135,125 @@ begin
 end;
 
 function TJPathParser.DoIndex : IGenerator;
+var
+  Token : TToken;
+  s : string;
+  ary : TArray<string>;
+  indexes : TArray<Integer>;
+  {$IFDEF FPC}
+  i : integer;
+  {$ENDIF}
 begin
-  var Token := Eat(ttINDEX);
-  var s := Token.Val;
+  Token := Eat(ttINDEX);
+  s := Token.Val;
   s := s.Substring(1,s.Length - 2);
-  var ary := s.Split([',']);
+  ary := s.Split([',']);
 
-  var indexes : TArray<Integer>;
   setLength(indexes, length(ary));
-  for var i := Low(ary) to High(ary) do
+  for {$IFNDEF FPC}var{$ENDIF} i := Low(ary) to High(ary) do
     indexes[i] :=ary[i].ToInteger;
   Result := TIndexGenerator.Create(indexes, Next);
 end;
 
 function TJPathParser.DoKeys: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TKeysGenerator.Create(Next);
 end;
 
 function TJPathParser.DoLastIndex: IGenerator;
+var
+  Token : TToken;
+  s : string;
+  ary : TArray<string>;
 begin
-  var Token := Eat(ttLASTINDEX);
-  var s := Token.Val;
+  Token := Eat(ttLASTINDEX);
+  s := Token.Val;
   s := s.Substring(1,s.Length - 2);
-  var ary := s.Split([':']);
+  ary := s.Split([':']);
 
   Result := TFromIndexGenerator.Create(ary[0].Trim.ToInteger, Next);
 end;
 
 function TJPathParser.DoLength: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TLengthGenerator.Create(Next);
 end;
 
 function TJPathParser.DoAppend: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TAppendGenerator.Create(Token.Val, Next);
 end;
 
 function TJPathParser.DoAvg: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TAvgGenerator.Create(Next);
 end;
 
 function TJPathParser.DoConcat: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TConcatGenerator.Create(Token.Val, Next);
 end;
 
 function TJPathParser.DoMax: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TMaxGenerator.Create(Next);
 end;
 
 function TJPathParser.DoMin: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TMinGenerator.Create(Next);
 end;
 
 function TJPathParser.DoDeep: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttDEEP);
+  Token := Eat(ttDEEP);
   Result := TDeepGenerator.Create(Token.Val.Substring(2), Next);
 end;
 
 function TJPathParser.DoFilter: IGenerator;
+var
+  Token : TToken;
+  s : string;
 begin
-  var Token := Eat(ttFILTER);
-  var s := Token.Val.Substring(3,Token.Val.length-5);
+  Token := Eat(ttFILTER);
+  s := Token.Val.Substring(3,Token.Val.length-5);
 
   Result := TFilterGenerator.Create(s, Next);
 end;
 
 function TJPathParser.DoFirstIndex: IGenerator;
+var
+  Token : TToken;
+  s : string;
+  ary : TArray<string>;
 begin
-  var Token := Eat(ttLASTINDEX);
-  var s := Token.Val;
+  Token := Eat(ttLASTINDEX);
+  s := Token.Val;
   s := s.Substring(1,s.Length - 2);
-  var ary := s.Split([':']);
+  ary := s.Split([':']);
 
   Result := TToIndexGenerator.Create(ary[1].Trim.ToInteger, Next);
 end;
@@ -241,9 +283,12 @@ begin
 end;
 
 function TJPathParser.DoWildcard : IGenerator;
+var
+  Token : TToken;
+  s : string;
 begin
-  var Token := Eat(ttWildcard);
-  var s := Token.Val;
+  Token := Eat(ttWildcard);
+  s := Token.Val;
   if s.StartsWith('[') then
     Result := TAllIndexesGenerator.Create(Next)
   else if s.StartsWith('..') then
@@ -253,24 +298,32 @@ begin
 end;
 
 function TJPathParser.DoSlice: IGenerator;
+var
+  Token : TToken;
+  s : string;
+  ary : TArray<string>;
 begin
-  var Token := Eat(ttSLICE);
-  var s := Token.Val;
+  Token := Eat(ttSLICE);
+  s := Token.Val;
   s := s.Substring(1,s.Length - 2);
-  var ary := s.Split([':']);
+  ary := s.Split([':']);
 
   Result := TSliceGenerator.Create(ary[0].Trim.ToInteger, ary[1].Trim.ToInteger, Next);
 end;
 
 function TJPathParser.DoStdDev: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TStdDevGenerator.Create(Next);
 end;
 
 function TJPathParser.DoSum: IGenerator;
+var
+  Token : TToken;
 begin
-  var Token := Eat(ttLENGTH);
+  Token := Eat(ttLENGTH);
   Result := TSumGenerator.Create(Next);
 end;
 
@@ -381,16 +434,20 @@ function TJPathTokenizer.GetNextToken : TToken;
 var
   i : integer;
   sp : TSpec;
+  s : string;
+  {$IFDEF FPC}
+  value : TToken;
+  {$ENDIF}
 begin
   if not HasMoreTokens then
     Exit(TToken.Null);
 
-  var s := FSource.Substring(FCursor);
+  s := FSource.Substring(FCursor);
 
   for i := Low(SPEC) to High(SPEC) do
   begin
     sp := SPEC[i];
-    var value := Match(sp.Reg, s, sp.Typ);
+    {$IFNDEF FPC}var{$ENDIF} value := Match(sp.Reg, s, sp.Typ);
     if value.Typ <> ttNULL then
       Exit(value);
   end;
@@ -403,8 +460,10 @@ begin
 end;
 
 function TJPathTokenizer.Match(const Reg, Str : string; Typ : TTokenType): TToken;
+var
+  Match : TMatch;
 begin
-  var Match := TRegEx.Match(str,Reg);
+  Match := TRegEx.Match(str,Reg);
   if not Match.Success then
     Exit(TToken.Null);
 
