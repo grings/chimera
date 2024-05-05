@@ -3,8 +3,13 @@ unit chimera.json.path.generators;
 interface
 
 uses
+  {$IFDEF FPC}
+  SysUtils,
+  Classes,
+  {$ELSE}
   System.SysUtils,
   System.Classes,
+  {$ENDIF}
   chimera.json;
 
 type
@@ -179,7 +184,11 @@ type
 implementation
 
 uses
+  {$IFDEF FPC}
+  Math;
+  {$ELSE}
   System.Math;
+  {$ENDIF}
 
 { TBaseGenerator }
 
@@ -247,28 +256,32 @@ end;
 function TIndexGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen : integer;
+  {$IFDEF FPC}
+  i : integer;
+  idx : integer;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   iLen := Length(Value);
-  for var i := 0 to iLen-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
   begin
     case Value[i].ValueType of
-      TJSONValueType.array:
+      TJSONValueType.&array:
       begin
-        for var idx in FIndexes do
+        for {$IFNDEF FPC}var {$ENDIF} idx in FIndexes do
         begin
           if (idx >= 0) and (idx <= Value[i].ArrayValue.Count-1) then
           begin
             SetLength(Result, length(Result)+1);
             case Value[i].ArrayValue.Types[idx] of
-              TJSONValueType.string:
+              TJSONValueType.&string:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Strings[idx]);
               TJSONValueType.number:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Numbers[idx]);
-              TJSONValueType.object:
+              TJSONValueType.&object:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Objects[idx]);
-              TJSONValueType.array:
+              TJSONValueType.&array:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Arrays[idx]);
               TJSONValueType.boolean:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Booleans[idx]);
@@ -281,13 +294,13 @@ begin
           begin
             SetLength(Result, length(Result)+1);
             case Value[i].ArrayValue.Types[Value[i].ArrayValue.Count + idx] of
-              TJSONValueType.string:
+              TJSONValueType.&string:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Strings[Value[i].ArrayValue.Count + idx]);
               TJSONValueType.number:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Numbers[Value[i].ArrayValue.Count + idx]);
-              TJSONValueType.object:
+              TJSONValueType.&object:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Objects[Value[i].ArrayValue.Count + idx]);
-              TJSONValueType.array:
+              TJSONValueType.&array:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Arrays[Value[i].ArrayValue.Count + idx]);
               TJSONValueType.boolean:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Booleans[Value[i].ArrayValue.Count + idx]);
@@ -301,9 +314,9 @@ begin
         end;
       end;
 
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
-      TJSONValueType.object,
+      TJSONValueType.&object,
       TJSONValueType.boolean,
       TJSONValueType.null,
       TJSONValueType.code:;
@@ -340,14 +353,18 @@ end;
 function TFromIndexGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen, iFrom : integer;
+  {$IFDEF FPC}
+  i : integer;
+  idx : integer;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   iLen := Length(Value);
-  for var i := 0 to iLen-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
   begin
     case Value[i].ValueType of
-      TJSONValueType.array:
+      TJSONValueType.&array:
       begin
         iFrom := FFromIndex;
         if iFrom < 0 then
@@ -355,19 +372,19 @@ begin
         if iFrom < 0 then
           iFrom := 0;
 
-        for var idx := iFrom to Value[i].ArrayValue.Count-1 do
+        for {$IFNDEF FPC}var {$ENDIF} idx := iFrom to Value[i].ArrayValue.Count-1 do
         begin
           if (idx >= 0) and (idx <= Value[i].ArrayValue.Count-1) then
           begin
             SetLength(Result, length(Result)+1);
             case Value[i].ArrayValue.Types[idx] of
-              TJSONValueType.string:
+              TJSONValueType.&string:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Strings[idx]);
               TJSONValueType.number:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Numbers[idx]);
-              TJSONValueType.object:
+              TJSONValueType.&object:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Objects[idx]);
-              TJSONValueType.array:
+              TJSONValueType.&array:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Arrays[idx]);
               TJSONValueType.boolean:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Booleans[idx]);
@@ -380,9 +397,9 @@ begin
         end;
       end;
 
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
-      TJSONValueType.object,
+      TJSONValueType.&object,
       TJSONValueType.boolean,
       TJSONValueType.null,
       TJSONValueType.code:;
@@ -408,33 +425,37 @@ end;
 function TToIndexGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen, iTo : integer;
+  {$IFDEF FPC}
+  i : integer;
+  idx : integer;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   iLen := Length(Value);
-  for var i := 0 to iLen-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
   begin
     case Value[i].ValueType of
-      TJSONValueType.array:
+      TJSONValueType.&array:
       begin
         iTo := FToIndex;
         if iTo < 0 then
           iTo := Value[i].ArrayValue.Count + iTo;
         if iTo < 0 then
           iTo := 0;
-        for var idx := 0 to iTo do
+        for {$IFNDEF FPC}var {$ENDIF} idx := 0 to iTo do
         begin
           if (idx >= 0) and (idx <= Value[i].ArrayValue.Count-1) then
           begin
             SetLength(Result, length(Result)+1);
             case Value[i].ArrayValue.Types[idx] of
-              TJSONValueType.string:
+              TJSONValueType.&string:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Strings[idx]);
               TJSONValueType.number:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Numbers[idx]);
-              TJSONValueType.object:
+              TJSONValueType.&object:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Objects[idx]);
-              TJSONValueType.array:
+              TJSONValueType.&array:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Arrays[idx]);
               TJSONValueType.boolean:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Booleans[idx]);
@@ -447,9 +468,9 @@ begin
         end;
       end;
 
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
-      TJSONValueType.object,
+      TJSONValueType.&object,
       TJSONValueType.boolean,
       TJSONValueType.null,
       TJSONValueType.code:;
@@ -472,12 +493,14 @@ begin
 end;
 
 procedure TDeepGenerator.CheckObject(var Result : TMultiValues; Obj : IJSONObject);
+var
+  r : TMultiValues;
 begin
-  var r := Result;
+  r := Result;
   Obj.Each(
     procedure(const Name : String; const Value : PMultiValue)
     begin
-      if Value.ValueType = TJSONValueType.object then
+      if Value.ValueType = TJSONValueType.&object then
         CheckObject(r, Value.ObjectValue);
     end
   );
@@ -488,13 +511,13 @@ begin
   begin
     SetLength(Result, length(Result)+1);
     case obj.Types[FProperty] of
-      TJSONValueType.string:
+      TJSONValueType.&string:
         Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Strings[FProperty]);
       TJSONValueType.number:
         Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Numbers[FProperty]);
-      TJSONValueType.object:
+      TJSONValueType.&object:
         Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Objects[FProperty]);
-      TJSONValueType.array:
+      TJSONValueType.&array:
         Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Arrays[FProperty]);
       TJSONValueType.boolean:
         Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Booleans[FProperty]);
@@ -510,21 +533,24 @@ end;
 function TDeepGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen : integer;
+  {$IFDEF FPC}
+  i : integer;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   iLen := Length(Value);
-  for var i := 0 to iLen-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
   begin
     case Value[i].ValueType of
-      TJSONValueType.object:
+      TJSONValueType.&object:
       begin
         CheckObject(Result, Value[i].ObjectValue);
       end;
 
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
-      TJSONValueType.array,
+      TJSONValueType.&array,
       TJSONValueType.boolean,
       TJSONValueType.null,
       TJSONValueType.code:;
@@ -545,26 +571,29 @@ end;
 function TPropertyGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen : integer;
+  {$IFDEF FPC}
+  i : integer;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   iLen := Length(Value);
-  for var i := 0 to iLen-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
   begin
     case Value[i].ValueType of
-      TJSONValueType.object:
+      TJSONValueType.&object:
       begin
         if Value[i].ObjectValue.Has[FProperty] then
         begin
           SetLength(Result, length(Result)+1);
           case Value[i].ObjectValue.Types[FProperty] of
-            TJSONValueType.string:
+            TJSONValueType.&string:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Strings[FProperty]);
             TJSONValueType.number:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Numbers[FProperty]);
-            TJSONValueType.object:
+            TJSONValueType.&object:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Objects[FProperty]);
-            TJSONValueType.array:
+            TJSONValueType.&array:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Arrays[FProperty]);
             TJSONValueType.boolean:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Booleans[FProperty]);
@@ -576,9 +605,9 @@ begin
         end;
       end;
 
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
-      TJSONValueType.array,
+      TJSONValueType.&array,
       TJSONValueType.boolean,
       TJSONValueType.null,
       TJSONValueType.code:;
@@ -596,34 +625,39 @@ end;
 
 procedure TAllPropertiesGenerator.CheckObject(var Result: TMultiValues;
   Obj: IJSONObject);
+var
+  r : TMultiValues;
+  {$IFDEF FPC}
+  j : integer;
+  sProp : string;
+  {$ENDIF}
 begin
-  var r := Result;
+  r := Result;
   Obj.Each(
     procedure(const Name : String; const Value : PMultiValue)
     begin
-      if Value.ValueType = TJSONValueType.object then
+      if Value.ValueType = TJSONValueType.&object then
         CheckObject(r, Value.ObjectValue);
     end
   );
 
   Result := r;
 
-  var mv : TMultiValue;
-  for var j := 0 to Obj.Count-1 do
+  for {$IFNDEF FPC}var {$ENDIF} j := 0 to Obj.Count-1 do
   begin
-    var sProp := Obj.Names[j];
+    {$IFNDEF FPC}var {$ENDIF} sProp := Obj.Names[j];
 
     if Obj.Has[sProp] then
     begin
       SetLength(Result, length(Result)+1);
       case obj.Types[sProp] of
-        TJSONValueType.string:
+        TJSONValueType.&string:
           Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Strings[sProp]);
         TJSONValueType.number:
           Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Numbers[sProp]);
-        TJSONValueType.object:
+        TJSONValueType.&object:
           Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Objects[sProp]);
-        TJSONValueType.array:
+        TJSONValueType.&array:
           Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Arrays[sProp]);
         TJSONValueType.boolean:
           Result[Length(Result)-1] := TMultiValue.Initialize(Obj.Booleans[sProp]);
@@ -646,23 +680,28 @@ end;
 function TAllPropertiesGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen : integer;
+  {$IFDEF FPC}
+  i : integer;
+  j : integer;
+  sProp : string;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   if FDeep then
   begin
     iLen := Length(Value);
-    for var i := 0 to iLen-1 do
+    for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
     begin
       case Value[i].ValueType of
-        TJSONValueType.object:
+        TJSONValueType.&object:
         begin
           CheckObject(Result, Value[i].ObjectValue);
         end;
 
-        TJSONValueType.string,
+        TJSONValueType.&string,
         TJSONValueType.number,
-        TJSONValueType.array,
+        TJSONValueType.&array,
         TJSONValueType.boolean,
         TJSONValueType.null,
         TJSONValueType.code:;
@@ -671,25 +710,24 @@ begin
   end else
   begin
     iLen := Length(Value);
-    for var i := 0 to iLen-1 do
+    for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
     begin
       case Value[i].ValueType of
-        TJSONValueType.object:
+        TJSONValueType.&object:
         begin
-          var mv : TMultiValue;
-          for var j := 0 to Value[i].ObjectValue.Count-1 do
+          for {$IFNDEF FPC}var {$ENDIF} j := 0 to Value[i].ObjectValue.Count-1 do
           begin
-            var sProp := Value[i].ObjectValue.Names[i];
+            {$IFNDEF FPC}var {$ENDIF} sProp := Value[i].ObjectValue.Names[i];
 
             SetLength(Result, length(Result)+1);
             case Value[i].ObjectValue.Types[sProp] of
-              TJSONValueType.string:
+              TJSONValueType.&string:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Strings[sProp]);
               TJSONValueType.number:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Numbers[sProp]);
-              TJSONValueType.object:
+              TJSONValueType.&object:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Objects[sProp]);
-              TJSONValueType.array:
+              TJSONValueType.&array:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Arrays[sProp]);
               TJSONValueType.boolean:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ObjectValue.Booleans[sProp]);
@@ -701,9 +739,9 @@ begin
           end;
         end;
 
-        TJSONValueType.string,
+        TJSONValueType.&string,
         TJSONValueType.number,
-        TJSONValueType.array,
+        TJSONValueType.&array,
         TJSONValueType.boolean,
         TJSONValueType.null,
         TJSONValueType.code:;
@@ -729,26 +767,30 @@ end;
 function TAllIndexesGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen : integer;
+  {$IFDEF FPC}
+  i : integer;
+  idx : integer;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   iLen := Length(Value);
-  for var i := 0 to iLen-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
   begin
     case Value[i].ValueType of
-      TJSONValueType.array:
+      TJSONValueType.&array:
       begin
-        for var idx := 0 to Value[i].ArrayValue.Count-1 do
+        for {$IFNDEF FPC}var {$ENDIF} idx := 0 to Value[i].ArrayValue.Count-1 do
         begin
           SetLength(Result, length(Result)+1);
           case Value[i].ArrayValue.Types[idx] of
-            TJSONValueType.string:
+            TJSONValueType.&string:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Strings[idx]);
             TJSONValueType.number:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Numbers[idx]);
-            TJSONValueType.object:
+            TJSONValueType.&object:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Objects[idx]);
-            TJSONValueType.array:
+            TJSONValueType.&array:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Arrays[idx]);
             TJSONValueType.boolean:
               Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Booleans[idx]);
@@ -760,9 +802,9 @@ begin
         end;
       end;
 
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
-      TJSONValueType.object,
+      TJSONValueType.&object,
       TJSONValueType.boolean,
       TJSONValueType.null,
       TJSONValueType.code:;
@@ -790,14 +832,18 @@ end;
 function TSliceGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen, iFrom, iTo : integer;
+  {$IFDEF FPC}
+  i : integer;
+  idx : integer;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   iLen := Length(Value);
-  for var i := 0 to iLen-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
   begin
     case Value[i].ValueType of
-      TJSONValueType.array:
+      TJSONValueType.&array:
       begin
         iTo := FToIndex;
         if iTo < 0 then
@@ -809,19 +855,19 @@ begin
           iFrom := Value[i].ArrayValue.Count + iFrom;
         if iFrom < 0 then
           iFrom := 0;
-        for var idx := iFrom to iTo do
+        for {$IFNDEF FPC}var {$ENDIF} idx := iFrom to iTo do
         begin
           if (idx >= 0) and (idx <= Value[i].ArrayValue.Count-1) then
           begin
             SetLength(Result, length(Result)+1);
             case Value[i].ArrayValue.Types[idx] of
-              TJSONValueType.string:
+              TJSONValueType.&string:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Strings[idx]);
               TJSONValueType.number:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Numbers[idx]);
-              TJSONValueType.object:
+              TJSONValueType.&object:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Objects[idx]);
-              TJSONValueType.array:
+              TJSONValueType.&array:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Arrays[idx]);
               TJSONValueType.boolean:
                 Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Booleans[idx]);
@@ -834,9 +880,9 @@ begin
         end;
       end;
 
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
-      TJSONValueType.object,
+      TJSONValueType.&object,
       TJSONValueType.boolean,
       TJSONValueType.null,
       TJSONValueType.code:;
@@ -861,22 +907,25 @@ end;
 function TLengthGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   iLen : integer;
+  {$IFDEF FPC}
+  i : integer;
+  {$ENDIF}
 begin
   SetLength(Result, 0);
 
   iLen := Length(Value);
-  for var i := 0 to iLen-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to iLen-1 do
   begin
     SetLength(Result, length(Result)+1);
     case Value[i].ValueType of
-      TJSONValueType.array:
+      TJSONValueType.&array:
       begin
         Result[Length(Result)-1] := TMultiValue.Initialize(Value[i].ArrayValue.Count);
       end;
 
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
-      TJSONValueType.object,
+      TJSONValueType.&object,
       TJSONValueType.boolean,
       TJSONValueType.null,
       TJSONValueType.code:;
@@ -915,11 +964,14 @@ end;
 function TKeysGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   r : TMultiValues;
+  {$IFDEF FPC}
+  mv : TMultiValue;
+  {$ENDIF}
 begin
   SetLength(r,0);
-  for var mv in Value do
+  for {$IFNDEF FPC}var {$ENDIF} mv in Value do
   begin
-    if mv.ValueType = TJSONValueType.object then
+    if mv.ValueType = TJSONValueType.&object then
     begin
       mv.ObjectValue.Each(
         procedure(const Name : string; const Value : PMultiValue)
@@ -937,17 +989,19 @@ function CompareArrays(const L, R : IJSONArray) : integer;
 begin
   Result := R.Count - L.Count;
 end;
+
 function CompareObjects(const L, R : IJSONObject) : integer;
 begin
   Result := L.AsSHA1.CompareTo(R.AsSHA1);
 end;
+
 function CompareMV(const L, R : TMultiValue) : integer;
 begin
   result := 0;
   if L.ValueType <> R.ValueType then
   begin
     case L.ValueType of
-      TJSONValueType.string:
+      TJSONValueType.&string:
         if R.ValueType in [TJSONValueType.code] then
           Result := L.StringValue.CompareTo(R.StringValue)
         else
@@ -962,12 +1016,12 @@ begin
             Result := 0
         else
           Result := 1;
-      TJSONValueType.array:
-        if R.ValueType <> TJSONValueType.Object then
+      TJSONValueType.&array:
+        if R.ValueType <> TJSONValueType.&Object then
           Result := 1
         else
           Result := -1;
-      TJSONValueType.object:
+      TJSONValueType.&object:
         Result := 1;
       TJSONValueType.boolean:
         if R.ValueType in [TJSONValueType.number] then
@@ -982,7 +1036,7 @@ begin
       TJSONValueType.null:
         Result := -1;
       TJSONValueType.code:
-        if R.ValueType in [TJSONValueType.string] then
+        if R.ValueType in [TJSONValueType.&string] then
           Result := L.StringValue.CompareTo(R.StringValue)
         else
           Result := -1;
@@ -990,7 +1044,7 @@ begin
   end else
   begin
     case L.ValueType of
-      TJSONValueType.string:
+      TJSONValueType.&string:
         Result := L.StringValue.CompareTo(R.StringValue);
       TJSONValueType.number:
         if R.NumberValue - L.NumberValue < 0 then
@@ -999,9 +1053,9 @@ begin
           Result := 1
         else
           Result := 0;
-      TJSONValueType.array:
+      TJSONValueType.&array:
         Result := CompareArrays(L.ArrayValue, R.ArrayValue);
-      TJSONValueType.object:
+      TJSONValueType.&object:
         Result := CompareObjects(L.ObjectValue, R.ObjectValue);
       TJSONValueType.boolean:
         if R.NumberValue - L.NumberValue < 0 then
@@ -1028,9 +1082,13 @@ begin
 end;
 
 function TMinGenerator.Process(Value: TMultiValues): TMultiValues;
+{$IFDEF FPC}
+var
+  mv : TMultiValue;
+{$ENDIF}
 begin
   SetLength(Result, 0);
-  for var mv in Value do
+  for {$IFNDEF FPC}var {$ENDIF} mv in Value do
   begin
     if Length(Result) = 0 then
     begin
@@ -1053,9 +1111,13 @@ begin
 end;
 
 function TMaxGenerator.Process(Value: TMultiValues): TMultiValues;
+{$IFDEF FPC}
+var
+  mv : TMultiValue;
+{$ENDIF}
 begin
   SetLength(Result, 0);
-  for var mv in Value do
+  for {$IFNDEF FPC}var {$ENDIF} mv in Value do
   begin
     if Length(Result) = 0 then
     begin
@@ -1080,10 +1142,13 @@ end;
 function TAvgGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   Val : Double;
+  {$IFDEF FPC}
+  mv : TMultiValue;
+  {$ENDIF}
 begin
   Val := 0;
 
-  for var mv in Value do
+  for {$IFNDEF FPC}var {$ENDIF} mv in Value do
   begin
     case mv.ValueType of
       TJSONValueType.number,
@@ -1106,10 +1171,13 @@ end;
 function TSumGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   Val : Double;
+  {$IFDEF FPC}
+  mv : TMultiValue;
+  {$ENDIF}
 begin
   Val := 0;
 
-  for var mv in Value do
+  for {$IFNDEF FPC}var {$ENDIF} mv in Value do
   begin
     case mv.ValueType of
       TJSONValueType.number,
@@ -1132,10 +1200,13 @@ end;
 function TStdDevGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   Val : TArray<Double>;
+  {$IFDEF FPC}
+  i : integer;
+  {$ENDIF}
 begin
   setLength(Val, Length(Value));
 
-  for var i := 0 to Length(Value)-1 do
+  for {$IFNDEF FPC}var {$ENDIF} i := 0 to Length(Value)-1 do
   begin
     case Value[i].ValueType of
       TJSONValueType.number,
@@ -1162,23 +1233,26 @@ end;
 function TConcatGenerator.Process(Value: TMultiValues): TMultiValues;
 var
   s : string;
+  {$IFDEF FPC}
+  mv : TMultiValue;
+  {$ENDIF}
 begin
   SetLength(Result, 1);
 
   s := '';
-  for var mv in Value do
+  for {$IFNDEF FPC}var {$ENDIF} mv in Value do
   begin
     if s <> '' then
       s := s + FValue;
 
     case mv.ValueType of
-      TJSONValueType.string:
+      TJSONValueType.&string:
         s := s + mv.StringValue;
       TJSONValueType.number:
         s := s + mv.NumberValue.ToString;
-      TJSONValueType.array:
+      TJSONValueType.&array:
         s := s + mv.ArrayValue.AsJSON;
-      TJSONValueType.object:
+      TJSONValueType.&object:
         s := s + mv.ObjectValue.AsJSON;
       TJSONValueType.boolean:
         s := s + mv.NumberValue.ToString;

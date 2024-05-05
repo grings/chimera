@@ -36,12 +36,21 @@ interface
 {$I chimera.inc}
 
 uses
+  {$IFDEF FPC}
+  SysUtils,
+  Classes;
+  {$ELSE}
   System.SysUtils,
   System.Classes,
   System.JSON
   {$IFDEF USEFASTCODE}, chimera.FastStringBuilder{$ENDIF};
+  {$ENDIF}
 
 type
+  {$IFDEF FPC}
+  TStringBuidler = TUnicodeStringBuilder;
+  {$ENDIF}
+
 {$SCOPEDENUMS ON}
   EInvalidJSONType = class(Exception);
   TProcConst<T> = reference to procedure(const Arg1: T);
@@ -189,7 +198,9 @@ type
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
+    {$IFNDEF FPC}
     function CreateRTLArray : System.JSON.TJSONArray;
+    {$ENDIF}
 
     procedure DeepScan(const PropertyName : string; const OnScanMatch : TMVScanMatchHandler); overload;
     procedure DeepScan(const PropertyNames : TArray<string>; const OnScanMatch : TMVScanMatchHandler); overload;
@@ -363,7 +374,9 @@ type
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
+    {$IFNDEF FPC}
     function CreateRTLObject : System.JSON.TJSONObject;
+    {$ENDIF}
 
     procedure DeepScan(PropertyName : string; OnScanMatch : TMVScanMatchHandler); overload;
     procedure DeepScan(PropertyNames : TArray<string>; OnScanMatch : TMVScanMatchHandler); overload;
@@ -474,7 +487,9 @@ type
     class function New : IJSONObject;
     class function From(const src : string = '') : IJSONObject; overload;
     class function From(const Stream : TStream) : IJSONObject; overload;
+    {$IFNDEF FPC}
     class function From(RTLObject : System.JSON.TJSONObject) : IJSONObject; overload;
+    {$ENDIF}
     class function FromFile(const Filename : string) : IJSONObject;
 
     class function Format(const src : string; Indent : byte = 3) : string;
@@ -491,7 +506,9 @@ type
     class function New : IJSONArray;
     class function From(const src : string = '') : IJSONArray; overload;
     class function From<T>(const ary : TArray<T>) : IJSONArray; overload;
+    {$IFNDEF FPC}
     class function From(RTLArray : System.JSON.TJSONArray) : IJSONArray; overload;
+    {$ENDIF}
     class function From(MVA : TMultiValues) : IJSONArray; overload;
   end;
 
@@ -507,17 +524,27 @@ function JSONValueTypeToString(t : TJSONValueTYpe) : string; deprecated 'Use TJS
 implementation
 
 uses
+  {$IFDEF FPC}
+  Character,
+  Variants,
+  Generics.Collections,
+  Generics.Defaults,
+  StrUtils,
+  DateUtils,
+  Rtti,
+  {$ELSE}
   System.Character,
   System.Variants,
   System.Generics.Collections,
   System.Generics.Defaults,
-  chimera.json.parser,
-  chimera.json.path,
   System.StrUtils,
   System.DateUtils,
+  System.Rtti,
+  {$ENDIF}
+  chimera.json.parser,
+  chimera.json.path,
   System.TimeSpan,
   System.NetEncoding,
-  System.Rtti,
   System.Hash;
 
 // global since we don't want to add size and initialization time to TMultiValue
@@ -533,10 +560,10 @@ end;
 class function TJSON.ValueToString(t : TJSONValueTYpe) : string;
 begin
   case t of
-    TJSONValueType.string:  Result := 'String';
+    TJSONValueType.&string:  Result := 'String';
     TJSONValueType.number:  Result := 'Number';
-    TJSONValueType.array:   Result := 'Array';
-    TJSONValueType.object:  Result := 'Object';
+    TJSONValueType.&array:   Result := 'Array';
+    TJSONValueType.&object:  Result := 'Object';
     TJSONValueType.boolean: Result := 'Boolean';
     TJSONValueType.null:    Result := 'Null';
     TJSONValueType.code:    Result := 'Code';
@@ -660,7 +687,9 @@ type
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
+    {$IFNDEF FPC}
     function CreateRTLArray: System.JSON.TJSONArray;
+    {$ENDIF}
 
     procedure Delete(const idx: Integer);
     procedure Clear;
@@ -855,7 +884,9 @@ type
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
+    {$IFNDEF FPC}
     function CreateRTLObject: System.JSON.TJSONObject;
+    {$ENDIF}
 
     procedure Remove(const name: string);
     function LoadFromStream(const Name : String; Stream : TStream; Encode : boolean) : IJSONObject; overload;
@@ -917,6 +948,8 @@ type
     destructor Destroy; override;
   end;
 
+  TMultiValuePair = TPair<string, PMultiValue>;
+
 function WhiteChar(c : Char; Whitespace : TWhitespace) : String; inline;
 begin
   case Whitespace of
@@ -948,12 +981,18 @@ begin
 end;
 
 function IsValidLocalDate(Value : TDateTime) : boolean;
+{$IFDEF FPC}
+begin
+  Result := (Double(Value) * 1000) + GetLocalTimeOffset() > 0;
+end;
+{$ELSE}
 var
-  TimeZone: TTimeZone;
+  TimeZone: TTimezone;
 begin
   TimeZone := TTimeZone.Local;
   Result := (Double(Value) * 1000) + TimeZone.UtcOffset.TotalMilliseconds >= 0;
 end;
+{$ENDIF}
 
 function StringIsJSON(const str : string) : boolean;
 begin
@@ -1160,7 +1199,7 @@ begin
               sb.append(Char(iChar));
               inc(i,4);
             end else
-              sb.insert(0, str[i+1]);
+              sb.append(str[i+1]);
           end;
         end;
         inc(i);
@@ -1204,10 +1243,12 @@ begin
     Result := TJSONObject.Create;
 end;
 
+{$IFNDEF FPC}
 class function TJSON.From(RTLObject: System.JSON.TJSONObject): IJSONObject;
 begin
   Result := TJSON.From(RTLObject.ToString);
 end;
+{$ENDIF}
 
 function JSONArray(const src : string) : IJSONArray;
 begin
@@ -1464,10 +1505,12 @@ begin
   FValues := TList<PMultiValue>.Create;
 end;
 
+{$IFNDEF FPC}
 function TJSONArrayImpl.CreateRTLArray: System.JSON.TJSONArray;
 begin
   Result := System.JSON.TJSONArray(System.JSON.TJSONObject.ParseJSONValue(TEncoding.UTF8.GetBytes(AsJSON),0));
 end;
+{$ENDIF}
 
 destructor TJSONArrayImpl.Destroy;
 begin
@@ -1568,15 +1611,15 @@ begin
     if not Result then
       exit;
     case FValues[i].ValueType of
-      TJSONValueType.string:
+      TJSONValueType.&string:
         Result := obj.IndexOf(Strings[i]) >= 0;
       TJSONValueType.number:
         Result := obj.IndexOf(Numbers[i]) >= 0;
       TJSONValueType.boolean:
         Result := obj.IndexOf(Booleans[i]) >= 0;
-      TJSONValueType.array:
+      TJSONValueType.&array:
         Result := obj.IndexOf(Arrays[i]) >= 0;
-      TJSONValueType.object:
+      TJSONValueType.&object:
         Result := obj.IndexOf(Objects[i]) >= 0;
       TJSONValueType.null:
         for j := 0 to obj.Count-1 do
@@ -1768,7 +1811,7 @@ end;
 
 function TJSONArrayImpl.GetString(const idx: integer): string;
 begin
-  VerifyType(FValues.Items[idx].ValueType, TJSONValueType.string);
+  VerifyType(FValues.Items[idx].ValueType, TJSONValueType.&string);
   Result := TJSON.Decode(FValues.Items[idx].StringValue);
 end;
 
@@ -1829,7 +1872,7 @@ begin
   Result := -1;
   for i := 0 to FValues.Count-1 do
   begin
-    if (Types[i] = TJSONValueType.String) and (FValues[i].StringValue = value) then
+    if (Types[i] = TJSONValueType.&String) and (FValues[i].StringValue = value) then
     begin
       result := i;
       break;
@@ -1859,7 +1902,7 @@ begin
   Result := -1;
   for i := 0 to FValues.Count-1 do
   begin
-    if (Types[i] = TJSONValueType.Array) and (Arrays[i].Equals(value)) then
+    if (Types[i] = TJSONValueType.&Array) and (Arrays[i].Equals(value)) then
     begin
       result := i;
       break;
@@ -1874,7 +1917,7 @@ begin
   Result := -1;
   for i := 0 to FValues.Count-1 do
   begin
-    if (Types[i] = TJSONValueType.Object) and (Objects[i].Equals(value)) then
+    if (Types[i] = TJSONValueType.&Object) and (Objects[i].Equals(value)) then
     begin
       result := i;
       break;
@@ -2013,7 +2056,7 @@ begin
   sEncoded := TJSON.Encode(value);
   for i := FValues.Count-1 downto 0 do
   begin
-    if (FValues[i].ValueType = TJSONValueType.string) and (FValues[i].StringValue = sEncoded) then
+    if (FValues[i].ValueType = TJSONValueType.&string) and (FValues[i].StringValue = sEncoded) then
       FValues.Delete(i);
   end;
 end;
@@ -2067,7 +2110,7 @@ begin
 
         varDate:
         begin
-          bRemove := FValues[i].StringValue = DateToStr(Value,TFormatSettings.Create('en-us'))
+          bRemove := FValues[i].StringValue = DateToStr(Value,CreateENUSFormatSettings)
         end;
 
         varBoolean:
@@ -2112,7 +2155,7 @@ begin
     if (FValues[i].ValueType = value.ValueType) then
     begin
       case FValues[i].ValueType of
-        TJSONValueType.string   : bRemove := FValues[i].StringValue = value.StringValue;
+        TJSONValueType.&string   : bRemove := FValues[i].StringValue = value.StringValue;
         TJSONValueType.number   : bRemove := (FValues[i].NumberValue = value.NumberValue) and (FValues[i].IntegerValue = value.IntegerValue);
         TJSONValueType.&array   : bRemove := FValues[i].ArrayValue.AsJSON = value.ArrayValue.AsJSON;
         TJSONValueType.&object  : bRemove := FValues[i].ObjectValue.AsJSON = value.ObjectValue.AsJSON;
@@ -2367,13 +2410,13 @@ begin
   if Value <> FValues.Items[idx].ValueType then
   begin
     case Value of
-      TJSONValueType.string:
+      TJSONValueType.&string:
         FValues.Items[idx].Initialize('');
       TJSONValueType.number:
         FValues.Items[idx].Initialize(0);
-      TJSONValueType.array:
+      TJSONValueType.&array:
         FValues.Items[idx].Initialize(TJSONArrayImpl.Create{(Self)});
-      TJSONValueType.object:
+      TJSONValueType.&object:
         FValues.Items[idx].Initialize(TJSONObject.Create{(Self)});
       TJSONValueType.boolean:
         FValues.Items[idx].Initialize(False);
@@ -2438,10 +2481,12 @@ begin
     Result := TJSONArrayImpl.Create;
 end;
 
+{$IFNDEF FPC}
 class function TJSONArray.From(RTLArray: System.JSON.TJSONArray): IJSONArray;
 begin
   Result := TJSONArray.From(RTLArray.ToString);
 end;
+{$ENDIF}
 
 class function TJSONArray.From(MVA: TMultiValues): IJSONArray;
 var
@@ -2451,13 +2496,13 @@ begin
   for mv in MVA do
   begin
     case mv.ValueType of
-      TJSONValueType.string:
+      TJSONValueType.&string:
         Result.Add(mv.StringValue);
       TJSONValueType.number:
         Result.Add(mv.NumberValue);
-      TJSONValueType.array:
+      TJSONValueType.&array:
         Result.Add(mv.ArrayValue);
-      TJSONValueType.object:
+      TJSONValueType.&object:
         Result.Add(mv.ObjectValue);
       TJSONValueType.boolean:
         if mv.IntegerValue = 0 then
@@ -2490,7 +2535,11 @@ begin
     else if ti = TypeInfo(IJSONObject) then
       Result.Add(v.AsType<IJSONObject>)
     else if ti = TypeInfo(TArray<Byte>) then
+      {$IFDEF FPC}
+      raise Exception.Create('Byte Array not supported on FPC at this time.')
+      {$ELSE}
       Result.Add(v.AsType<TArray<Byte>>)
+      {$ENDIF}
     else if ti = TypeInfo(String) then
       Result.Add(v.AsString)
     else if ti = TypeInfo(Double) then
@@ -2590,8 +2639,8 @@ procedure TJSONObject.AsJSON(var Result : string; Whitespace : TWhitespace = TWh
     bFirst := False;
   end;
 var
-  list : TList<TPair<string, PMultiValue>>;
-  item : TPair<string, PMultiValue>;
+  list : TList<TMultiValuePair>;
+  item : TMultiValuePair;
   bFirst : boolean;
 begin
   if FIsSimpleValue then
@@ -2604,7 +2653,7 @@ begin
 
     if WhiteSpace = TWhitespace.sorted then
     begin
-      list := TList<TPair<string, PMultiValue>>.Create;
+      list := TList<TMultiValuePair>.Create;
       try
         for item in FValues do
         begin
@@ -2709,7 +2758,7 @@ begin
 
     if WhiteSpace = TWhitespace.sorted then
     begin
-      list := TList<TPair<string, PMultiValue>>.Create;
+      list := TList<TMultiValuePair>.Create;
       try
         for item in FValues do
         begin
@@ -2822,10 +2871,12 @@ begin
   FValues.OnValueNotify := DisposeOfValue;
 end;
 
+{$IFNDEF FPC}
 function TJSONObject.CreateRTLObject: System.JSON.TJSONObject;
 begin
   Result := System.JSON.TJSONObject(System.JSON.TJSONObject.ParseJSONValue(TEncoding.UTF8.GetBytes(AsJSON),0));
 end;
+{$ENDIF}
 
 procedure TJSONObject.DeepScan(PropertyName: string;
   OnScanMatch: TMVScanMatchHandler);
@@ -3164,13 +3215,13 @@ begin
       exit;
     end;
     case item.Value.ValueType of
-      TJSONValueType.string,
+      TJSONValueType.&string,
       TJSONValueType.number,
       TJSONValueType.boolean:
         Result := item.Value.ToVariant = obj[item.Key];
-      TJSONValueType.array:
+      TJSONValueType.&array:
         Result := item.Value.ArrayValue.Equals(obj.Arrays[item.Key]);
-      TJSONValueType.object:
+      TJSONValueType.&object:
         Result := item.Value.ObjectValue.Equals(obj.Objects[item.Key]);
       TJSONValueType.null:
         Result := True; // only one value option for this type so if equal above will match here.
@@ -3401,7 +3452,7 @@ end;
 
 function TJSONObject.GetString(const name: string): string;
 begin
-  VerifyType(ValueOf[Name].ValueType, TJSONValueType.string);
+  VerifyType(ValueOf[Name].ValueType, TJSONValueType.&string);
   Result := TJSON.Decode(ValueOf[Name].StringValue);
 end;
 
@@ -3934,7 +3985,7 @@ end;
 
 procedure TJSONObject.SetTime(const name : string; const Value: TDateTime);
 var
-  sTime : string;
+  sTime : {$IFDEF FPC}AnsiString{$ELSE}String{$ENDIF};
   sec, ms : integer;
 begin
   sec := SecondOf(Value);
@@ -3958,13 +4009,13 @@ begin
   if mv.ValueType <> Value then
   begin
     case Value of
-      TJSONValueType.string:
+      TJSONValueType.&string:
         SetString(Name, '');
       TJSONValueType.number:
         SetNumber(Name, 0);
-      TJSONValueType.array:
+      TJSONValueType.&array:
         SetArray(Name, TJSONArrayImpl.Create);
-      TJSONValueType.object:
+      TJSONValueType.&object:
         SetObject(Name, TJSONObject.Create);
       TJSONValueType.boolean:
         SetBoolean(Name, False);
@@ -4029,7 +4080,7 @@ end;
 
 constructor TMultiValue.Initialize(const Value: String; encode : boolean = false);
 begin
-  Self.ValueType := TJSONValueType.string;
+  Self.ValueType := TJSONValueType.&string;
   if encode then
     Self.StringValue := TJSON.Encode(Value)
   else
@@ -4053,7 +4104,7 @@ begin
   case Self.ValueType of
     TJSONValueType.code:
       Result := Result+Self.StringValue;
-    TJSONValueType.string:
+    TJSONValueType.&string:
     begin
       Result := Result+'"'+Self.StringValue+'"';
     end;
@@ -4076,7 +4127,7 @@ begin
       else
         Result := Result+FloatToStr(Self.NumberValue);
     end;
-    TJSONValueType.array:
+    TJSONValueType.&array:
     begin
       if Assigned(Self.ArrayValue) then
         Self.ArrayValue.AsJSON(Result, Whitespace)
@@ -4084,7 +4135,7 @@ begin
         Result := Result+'null';
 
     end;
-    TJSONValueType.object:
+    TJSONValueType.&object:
     begin
       if Assigned(Self.ObjectValue) then
         Self.ObjectValue.AsJSON(Result, Whitespace)
@@ -4166,7 +4217,7 @@ var
   jsNull : IJSONObject;
 begin
   case ValueType of
-    TJSONValueType.string:
+    TJSONValueType.&string:
       result := TJSON.Decode(StringValue);
     TJSONValueType.number:
       result := NumberValue;
@@ -4236,7 +4287,7 @@ begin
 
       varDate:
       begin
-        Initialize(DateToStr(Value,TFormatSettings.Create('en-us')));
+        Initialize(DateToStr(Value,CreateENUSFormatSettings));
       end;
 
       varBoolean:
@@ -4276,7 +4327,7 @@ begin
   case Self.ValueType of
     TJSONValueType.code:
       Result.Append(Self.StringValue);
-    TJSONValueType.string:
+    TJSONValueType.&string:
     begin
       Result.Append('"'+Self.StringValue+'"');
     end;
@@ -4299,14 +4350,14 @@ begin
       else
         Result.Append(FloatToStr(Self.NumberValue));
     end;
-    TJSONValueType.array:
+    TJSONValueType.&array:
     begin
       if Assigned(Self.ArrayValue) then
          Self.ArrayValue.AsJSON(Result, Whitespace)
       else
         Result.Append('null');
     end;
-    TJSONValueType.object:
+    TJSONValueType.&object:
     begin
       if Assigned(Self.ObjectValue) then
        Self.ObjectValue.AsJSON(Result, Whitespace)
@@ -4330,13 +4381,13 @@ begin
   Self.StringValue := Value.StringValue;
   Self.NumberValue := Value.NumberValue;
   Self.IntegerValue := Value.IntegerValue;
-  if Self.ValueTYpe = TJSONValueType.Object then
+  if Self.ValueTYpe = TJSONValueType.&Object then
     Self.ObjectValue := Value.ObjectValue;
-  if Self.ValueTYpe = TJSONValueType.Array then
+  if Self.ValueTYpe = TJSONValueType.&Array then
     Self.ArrayValue := Value.ArrayValue;
 end;
 
 initialization
-  FFmt := TFormatSettings.Create('en-us');
+  FFmt := CreateENUSFormatSettings;
 
 end.

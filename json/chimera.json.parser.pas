@@ -36,11 +36,19 @@ interface
 {$I chimera.inc}
 
 uses
+  {$IFDEF FPC}
+  SysUtils,
+  Classes,
+  Generics.Collections,
+  Rtti,
+  Types,
+  {$ELSE}
   System.SysUtils,
   System.Classes,
   System.Generics.Collections,
-  System.Types,
   System.Rtti,
+  System.Types,
+  {$ENDIF}
   chimera.json
   {$IFDEF USEFASTCODE}, chimera.FastStringBuilder{$ENDIF};
 
@@ -84,11 +92,29 @@ type
     class function ParseArray(const AText : string) : IJSONArray; overload;
   end;
 
+function CreateENUSFormatSettings : TFormatSettings; inline;
+
 implementation
 
 uses
+  {$IFDEF FPC}
+  Character,
+  Variants;
+  {$ELSE}
   System.Character,
   System.Variants;
+  {$ENDIF}
+
+function CreateENUSFormatSettings : TFormatSettings;
+begin
+  {$IFDEF FPC}
+  Result.ThousandSeparator := ',';
+  Result.DecimalSeparator := '.';
+  {$ELSE}
+  Result := TFormatSettings.Create('en-us');
+  {$ENDIF}
+end;
+
 
 { TParser }
 
@@ -98,7 +124,9 @@ begin
   FDepth := 0;
   FOperatorStack := TStack<TParseToken>.Create;
   FValueStack := TStack<TMultiValue>.Create;
-  FFmt := TFormatSettings.Create('en-us');
+
+  FFmt := CreateENUSFormatSettings;
+
   FTmpValue := {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder.Create;
   FTmpIdent := {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder.Create;
 end;
@@ -115,7 +143,7 @@ end;
 function TParser.OperatorToStr(Token : TParseToken) : string;
 begin
   case Token of
-    TParser.TParseToken.String:
+    TParser.TParseToken.&String:
       Result := 'String';
     TParser.TParseToken.Colon:
       Result := 'Colon';
@@ -189,7 +217,7 @@ begin
       ':': FToken := TParseToken.Colon;
       '"':
       begin
-        FToken := TParseToken.String;
+        FToken := TParseToken.&String;
         FTmpValue.Clear;
         for i := FIndex+1 to FTextLength do
         begin
@@ -257,8 +285,8 @@ begin
     while FToken <> TParseToken.CloseArray do
     begin
       case FToken of
-        TParser.TParseToken.String:
-          Result.Add(@FTokenValue);
+        TParser.TParseToken.&String:
+          Result.Add(PMultiValue(@FTokenValue));
           //Result.Add(FTokenValue.StringValue);
         TParser.TParseToken.OpenObject:
           Result.Add(ParseObject);
@@ -266,13 +294,13 @@ begin
           Result.Add(ParseArray);
         TParser.TParseToken.Value:
           case FTokenValue.ValueType of
-            TJSONValueType.string:
+            TJSONValueType.&string:
               Result.Add(FTokenValue.StringValue);
             TJSONValueType.number:
               Result.Add(FTokenValue.NumberValue);
-            TJSONValueType.array:
+            TJSONValueType.&array:
               Result.Add(FTokenValue.ArrayValue);
-            TJSONValueType.object:
+            TJSONValueType.&object:
               Result.Add(FTokenValue.ObjectValue);
             TJSONValueType.boolean:
               Result.Add(FTokenValue.IntegerValue <> 0);
@@ -325,7 +353,7 @@ begin
     GetToken;
     while FToken <> TParseToken.CloseObject do
     begin
-      if FToken <> TParseToken.String then
+      if FToken <> TParseToken.&String then
         raise EChimeraParseException.Create('String Expected');
       sName := FTokenValue.StringValue;
       GetToken;
@@ -333,7 +361,7 @@ begin
         raise EChimeraParseException.Create('Colon Expected');
       GetToken;
       case FToken of
-        TParser.TParseToken.String:
+        TParser.TParseToken.&String:
           Obj.Raw[sName] := @FTokenValue;
         TParser.TParseToken.OpenObject:
           begin
@@ -367,13 +395,13 @@ begin
           end;
         TParser.TParseToken.Value:
           case FTokenValue.ValueType of
-            TJSONValueType.string:
+            TJSONValueType.&string:
               Obj.Strings[sName] := FTokenValue.StringValue;
             TJSONValueType.number:
               Obj.Numbers[sName] := FTokenValue.NumberValue;
-            TJSONValueType.array:
+            TJSONValueType.&array:
               Obj.Arrays[sName] := FTokenValue.ArrayValue;
-            TJSONValueType.object:
+            TJSONValueType.&object:
               Obj.Objects[sName] := FTokenValue.ObjectValue;
             TJSONValueType.boolean:
               Obj.Booleans[sName] := FTokenValue.IntegerValue <> 0;
@@ -420,17 +448,17 @@ function TParser.Execute(const AText: string): IJSONObject;
   begin
     Result := TJSON.New;
     case FToken of
-      TParser.TParseToken.String:
+      TParser.TParseToken.&String:
         Result.AsString := FTokenValue.StringValue;
       TParser.TParseToken.Value:
         case FTokenValue.ValueType of
-          TJSONValueType.string:
+          TJSONValueType.&string:
             Result.AsString := FTokenValue.StringValue;
           TJSONValueType.number:
             Result.AsNumber := FTokenValue.NumberValue;
-          TJSONValueType.array:
+          TJSONValueType.&array:
             Result.AsArray := FTokenValue.ArrayValue;
-          TJSONValueType.object:
+          TJSONValueType.&object:
             Result := FTokenValue.ObjectValue;
           TJSONValueType.boolean:
             Result.AsBoolean := FTokenValue.IntegerValue <> 0;
@@ -456,7 +484,7 @@ begin
   case FToken of
     TParser.TParseToken.OpenObject:
       Result := ParseObject;
-    TParser.TParseToken.String,
+    TParser.TParseToken.&String,
     TParser.TParseToken.Value,
     TParser.TParseToken.OpenArray:
       Result := SimpleJSONValue;
