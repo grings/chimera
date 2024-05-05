@@ -2193,14 +2193,18 @@ end;
 
 procedure TJSONArrayImpl.DeepScan(const PropertyNames: TArray<string>;
   const OnScanMatch: TMVScanMatchHandler);
+{$IFDEF FPC}
+var
+  va : PMultiValue;
+{$ENDIF}
 begin
-  for var va in FValues do
+  for {$IFNDEF FPC}var{$ENDIF} va in FValues do
   begin
-    if va^.ValueType = TJSONValueType.Object then
+    if va^.ValueType = TJSONValueType.&Object then
     begin
       if Assigned(va^.ObjectValue) then
         va^.ObjectValue.DeepScan(PropertyNames, OnScanMatch);
-    end else if va^.ValueType = TJSONValueType.Array then
+    end else if va^.ValueType = TJSONValueType.&Array then
       if Assigned(va^.ArrayValue) then
         va^.ArrayValue.DeepScan(PropertyNames, OnScanMatch);
   end;
@@ -2208,14 +2212,18 @@ end;
 
 procedure TJSONArrayImpl.DeepScan(const PropertyName: string;
   const OnScanMatch: TMVScanMatchHandler);
+{$IFDEF FPC}
+var
+  va : PMultiValue;
+{$ENDIF}
 begin
-  for var va in FValues do
+  for {$IFNDEF FPC}var{$ENDIF} va in FValues do
   begin
-    if va^.ValueType = TJSONValueType.Object then
+    if va^.ValueType = TJSONValueType.&Object then
     begin
       if Assigned(va^.ObjectValue) then
         va^.ObjectValue.DeepScan(PropertyName, OnScanMatch);
-    end else if va^.ValueType = TJSONValueType.Array then
+    end else if va^.ValueType = TJSONValueType.&Array then
       if Assigned(va^.ArrayValue) then
         va^.ArrayValue.DeepScan(PropertyName, OnScanMatch);
   end;
@@ -2880,16 +2888,20 @@ end;
 
 procedure TJSONObject.DeepScan(PropertyName: string;
   OnScanMatch: TMVScanMatchHandler);
+{$IFDEF FPC}
+var
+  v : TMultiValuePair;
+{$ENDIF}
 begin
-  for var v in FValues do
+  for {$IFNDEF FPC}var{$ENDIF} v in FValues do
   begin
     if v.Key = PropertyName then
       OnScanMatch(Self, v.Key, v.Value);
-    if v.Value^.ValueType = TJSONValueType.Object then
+    if v.Value^.ValueType = TJSONValueType.&Object then
     begin
       if Assigned(v.Value^.ObjectValue) then
         v.Value^.ObjectValue.DeepScan(PropertyName, OnScanMatch);
-    end else if v.Value^.ValueType = TJSONValueType.array then
+    end else if v.Value^.ValueType = TJSONValueType.&array then
     begin
       if Assigned(v.Value^.ArrayValue) then
       begin
@@ -2901,23 +2913,29 @@ end;
 
 procedure TJSONObject.DeepScan(PropertyNames: TArray<string>;
   OnScanMatch: TMVScanMatchHandler);
+{$IFDEF FPC}
+var
+  p : string;
+  v : TMultiValuePair;
+  sProp : string;
+{$ENDIF}
 begin
   if Length(PropertyNames) < FValues.Count then
   begin
-    for var p in PropertyNames do
+    for {$IFNDEF FPC}var{$ENDIF} p in PropertyNames do
       DeepScan(p, OnScanMatch);
   end else
   begin
-    for var v in FValues do
+    for {$IFNDEF FPC}var{$ENDIF} v in FValues do
     begin
-      for var sProp in PropertyNames do
+      for {$IFNDEF FPC}var{$ENDIF} sProp in PropertyNames do
         if v.Key = sProp then
           OnScanMatch(Self, v.Key, v.Value);
-      if v.Value^.ValueType = TJSONValueType.Object then
+      if v.Value^.ValueType = TJSONValueType.&Object then
       begin
         if Assigned(v.Value^.ObjectValue) then
           v.Value^.ObjectValue.DeepScan(PropertyNames, OnScanMatch);
-      end else if v.Value^.ValueType = TJSONValueType.array then
+      end else if v.Value^.ValueType = TJSONValueType.&array then
       begin
         if Assigned(v.Value^.ArrayValue) then
         begin
