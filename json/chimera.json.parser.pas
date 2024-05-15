@@ -167,7 +167,7 @@ begin
 end;
 
 function TParser.GetToken: boolean;
-  function IsLetterOrDigit(c : Char; fmt : TFormatSettings) : boolean; inline;
+  function IsLetterOrDigit(c : {$IFDEF FPC}{$IFDEF UNICODE}Char{$ELSE}UnicodeChar{$ENDIF}{$ELSE}Char{$ENDIF}; fmt : TFormatSettings) : boolean; inline;
   begin
     Result := (c.IsLetterOrDigit) or (c = '-') or (c = '+') or (c = fmt.DecimalSeparator);
   end;
