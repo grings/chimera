@@ -501,7 +501,8 @@ type
   public
     class constructor Create;
 
-    class function New : IJSONObject;
+    class function New : IJSONObject; overload;
+    class function New(SetupNewObject : TChangeObjectHandler) : IJSONObject; overload;
     class function From(const src : string = '') : IJSONObject; overload;
     class function From(const Stream : TStream) : IJSONObject; overload;
     {$IFNDEF FPC}
@@ -520,7 +521,8 @@ type
 
   TJSONArray = class
   public
-    class function New : IJSONArray;
+    class function New : IJSONArray; overload;
+    class function New(SetupNewArray : TChangeArrayHandler) : IJSONArray; overload;
     class function From(const src : string = '') : IJSONArray; overload;
     class function From<T>(const ary : TArray<T>) : IJSONArray; overload;
     {$IFNDEF FPC}
@@ -1032,6 +1034,12 @@ end;
 class function TJSON.IsJSON(const str : string) : boolean;
 begin
   result := (str <> '') and (str[1] = '{') and (str[length(str)] = '}')
+end;
+
+class function TJSON.New(SetupNewObject: TChangeObjectHandler): IJSONObject;
+begin
+  Result := TJSON.New;
+  SetupNewObject(Result);
 end;
 
 class function TJSON.New: IJSONObject;
@@ -2591,6 +2599,12 @@ begin
     else
       raise EInvalidJSONType.Create('Cannot determine value type for storage in JSON Array.');
   end;
+end;
+
+class function TJSONArray.New(SetupNewArray: TChangeArrayHandler): IJSONArray;
+begin
+  Result := TJSONArray.New;
+  SetupNewArray(Result);
 end;
 
 class function TJSONArray.New: IJSONArray;
