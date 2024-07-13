@@ -486,6 +486,13 @@ type
     procedure RaiseIfMissing(const PropertyName : string); overload;
     procedure RaiseIfMissing(const PropertyNamesAndTypes : TArray<TNameTypePair>); overload;
     procedure RaiseIfMissing(const PropertyNameAndType : TNameTypePair); overload;
+
+    function IsMissing(const PropertyNames : TArray<string>; var MissingPropertyName : string) : boolean; overload;
+    function IsMissing(const PropertyNames : TArray<string>) : boolean; overload;
+    function IsMissing(const PropertyName : string) : boolean; overload;
+    function IsMissing(const PropertyNamesAndTypes : TArray<TNameTypePair>; var MsisingNameAndType : TNameTypePair) : boolean; overload;
+    function IsMissing(const PropertyNamesAndTypes : TArray<TNameTypePair>) : boolean; overload;
+    function IsMissing(const PropertyNameAndType : TNameTypePair) : boolean; overload;
   end;
 
   TJSON = class
@@ -957,6 +964,13 @@ type
     procedure RaiseIfMissing(const PropertyName : string); overload;
     procedure RaiseIfMissing(const PropertyNamesAndTypes : TArray<TNameTypePair>); overload;
     procedure RaiseIfMissing(const PropertyNameAndType : TNameTypePair); overload;
+
+    function IsMissing(const PropertyNames : TArray<string>; var MissingProperty : string) : boolean; overload;
+    function IsMissing(const PropertyNames : TArray<string>) : boolean; overload;
+    function IsMissing(const PropertyName : string) : boolean; overload;
+    function IsMissing(const PropertyNamesAndTypes : TArray<TNameTypePair>; var MissingNameAndType : TNameTypePair) : boolean; overload;
+    function IsMissing(const PropertyNamesAndTypes : TArray<TNameTypePair>) : boolean; overload;
+    function IsMissing(const PropertyNameAndType : TNameTypePair) : boolean; overload;
 
     class function From(Value : PMultivalue) : IJSONObject;
 
@@ -3584,6 +3598,75 @@ begin
   Result := FIsSimpleValue and (FSimpleValue.ValueType = TJSONValueType.null) or (FValues.Count = 0);
 end;
 
+function TJSONObject.IsMissing(const PropertyNames: TArray<string>; var MissingProperty : string): boolean;
+var
+  prop : string;
+begin
+  Result := False;
+  for prop in PropertyNames do
+  begin
+    if not Has[prop] then
+    begin
+      MissingProperty := prop;
+      exit(True);
+    end;
+  end;
+end;
+
+function TJSONObject.IsMissing(const PropertyName: string): boolean;
+begin
+  Result := Not Has[PropertyName];
+end;
+
+function TJSONObject.IsMissing(
+  const PropertyNamesAndTypes: TArray<TNameTypePair>; var MissingNameAndType : TNameTypePair): boolean;
+var
+  pt : TNameTypePair;
+begin
+  Result := False;
+  for pt in PropertyNamesAndTypes do
+  begin
+    MissingNameAndType := pt;
+    if not Has[pt.Name] then
+      Exit(True);
+    if Types[pt.Name] <> pt.&Type then
+      Exit(True);
+  end;
+end;
+
+function TJSONObject.IsMissing(
+  const PropertyNameAndType: TNameTypePair): boolean;
+begin
+  Result := IsMissing([PropertyNameAndType]);
+end;
+
+function TJSONObject.IsMissing(
+  const PropertyNamesAndTypes: TArray<TNameTypePair>): boolean;
+var
+  pt : TNameTypePair;
+begin
+  Result := False;
+  for pt in PropertyNamesAndTypes do
+  begin
+    if not Has[pt.Name] then
+      Exit(True);
+    if Types[pt.Name] <> pt.&Type then
+      Exit(True);
+  end;
+end;
+
+function TJSONObject.IsMissing(const PropertyNames: TArray<string>): boolean;
+var
+  prop : string;
+begin
+  Result := False;
+  for prop in PropertyNames do
+  begin
+    if not Has[prop] then
+      exit(True);
+  end;
+end;
+
 function TJSONObject.IsSimpleValue: boolean;
 begin
   Result := FIsSimpleValue;
@@ -3733,11 +3816,8 @@ procedure TJSONObject.RaiseIfMissing(const PropertyNames: TArray<string>);
 var
   prop : string;
 begin
-  for prop in PropertyNames do
-  begin
-    if not Has[prop] then
-      raise EChimeraJSONException.Create('Property "'+prop+'" is missing in object.');
-  end;
+  if IsMissing(PropertyNames, prop) then
+    raise EChimeraJSONException.Create('Property "'+prop+'" is missing in object.');
 end;
 
 procedure TJSONObject.RaiseIfMissing(const PropertyNameAndType: TNameTypePair);
