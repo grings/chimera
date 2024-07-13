@@ -265,6 +265,12 @@ type
     function Clone : IJSONArray;
   end;
 
+  TNameTypePair = record
+    Name : string;
+    &Type : TJSONValueType;
+    class function From(const AName : string; AType : TJSONValueType) : TNameTypePair; static;
+  end;
+
   IJSONObject = interface(IInterface)
     ['{D99D532B-A21C-4135-9DF5-0FFC8538CED4}']
     function GetOnChange: TChangeObjectHandler;
@@ -476,6 +482,10 @@ type
     function Query(const Path : string) : IJSONArray;
     procedure Update(JQL : string);
 
+    procedure RaiseIfMissing(const PropertyNames : TArray<string>); overload;
+    procedure RaiseIfMissing(const PropertyName : string); overload;
+    procedure RaiseIfMissing(const PropertyNamesAndTypes : TArray<TNameTypePair>); overload;
+    procedure RaiseIfMissing(const PropertyNameAndType : TNameTypePair); overload;
   end;
 
   TJSON = class
@@ -943,7 +953,13 @@ type
     function ValueType : TJSONValueType;
     function AsValue : TMultiValue;
 
+    procedure RaiseIfMissing(const PropertyNames : TArray<string>); overload;
+    procedure RaiseIfMissing(const PropertyName : string); overload;
+    procedure RaiseIfMissing(const PropertyNamesAndTypes : TArray<TNameTypePair>); overload;
+    procedure RaiseIfMissing(const PropertyNameAndType : TNameTypePair); overload;
+
     class function From(Value : PMultivalue) : IJSONObject;
+
     constructor Create; overload; virtual;
     destructor Destroy; override;
   end;
@@ -3700,6 +3716,40 @@ begin
   Result := TJPathParser.Parse(Self, Path);
 end;
 
+procedure TJSONObject.RaiseIfMissing(const PropertyNamesAndTypes: TArray<TNameTypePair>);
+var
+  pt : TNameTypePair;
+begin
+  for pt in PropertyNamesAndTypes do
+  begin
+    if not Has[pt.Name] then
+      raise EChimeraJSONException.Create('Property "'+pt.Name+'" is missing.');
+    if Types[pt.Name] <> pt.&Type then
+      raise EChimeraJSONException.Create('Property "'+pt.Name+'" expected to be "'+TJSON.ValueToString(pt.&Type)+' but is of type "'+TJSON.ValueToString(Types[pt.Name])+'".');
+  end;
+end;
+
+procedure TJSONObject.RaiseIfMissing(const PropertyNames: TArray<string>);
+var
+  prop : string;
+begin
+  for prop in PropertyNames do
+  begin
+    if not Has[prop] then
+      raise EChimeraJSONException.Create('Property "'+prop+'" is missing in object.');
+  end;
+end;
+
+procedure TJSONObject.RaiseIfMissing(const PropertyNameAndType: TNameTypePair);
+begin
+  RaiseIfMissing([PropertyNameAndType]);
+end;
+
+procedure TJSONObject.RaiseIfMissing(const PropertyName: string);
+begin
+  RaiseIfMissing([PropertyName]);
+end;
+
 procedure TJSONObject.Reload(const Source: string);
 begin
   Clear;
@@ -4403,6 +4453,15 @@ begin
     Self.ObjectValue := Value.ObjectValue;
   if Self.ValueTYpe = TJSONValueType.&Array then
     Self.ArrayValue := Value.ArrayValue;
+end;
+
+{ TNameTypePair }
+
+class function TNameTypePair.From(const AName: string;
+  AType: TJSONValueType): TNameTypePair;
+begin
+  Result.Name := AName;
+  Result.&Type := AType;
 end;
 
 initialization
