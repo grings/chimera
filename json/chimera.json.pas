@@ -66,6 +66,9 @@ type
   TDuplicateResolution = (Skip, Overwrite);
   TDuplicateHandler = reference to function(const prop : string) : TDuplicateResolution;
 
+  TBreakableProc<T> = reference to procedure(const Arg1: T; var Continue : Boolean);
+  TBreakableProc<T1,T2> = reference to procedure (const Arg1: T1; const Arg2: T2; var Continue : Boolean);
+
   TScanMatchHandler<T> = reference to procedure(const prop : string; var Value : T);
 
   EChimeraException = class(Exception);
@@ -230,6 +233,17 @@ type
     procedure Each(proc : TProcConst<Variant>); overload;
     procedure Each(proc : TProcConst<PMultiValue>); overload;
 
+    procedure Each(proc : TBreakableProc<TGuid>); overload;
+    procedure Each(proc : TBreakableProc<TDateTime>); overload;
+    procedure Each(proc : TBreakableProc<string>); overload;
+    procedure Each(proc : TBreakableProc<double>); overload;
+    procedure Each(proc : TBreakableProc<int64>); overload;
+    procedure Each(proc : TBreakableProc<boolean>); overload;
+    procedure Each(proc : TBreakableProc<IJSONObject>); overload;
+    procedure Each(proc : TBreakableProc<IJSONArray>); overload;
+    procedure Each(proc : TBreakableProc<Variant>); overload;
+    procedure Each(proc : TBreakableProc<PMultiValue>); overload;
+
     //function ParentArray : IJSONArray;
     //function ParentObject : IJSONObject;
 
@@ -350,10 +364,10 @@ type
     //procedure ParentOverride(parent : IJSONArray); overload;
     //procedure ParentOverride(parent : IJSONObject); overload;
 
-    procedure Each(proc : TProcConst<string, PMultiValue>); overload;
     procedure Add(const name : string; const value : PMultiValue); overload;
     property Raw[const name : string] : PMultiValue read GetRaw write SetRaw;
 
+    procedure Each(proc : TProcConst<string, PMultiValue>); overload;
     procedure Each(proc : TProcConst<string, string>); overload;
     procedure Each(proc : TProcConst<string, double>); overload;
     procedure Each(proc : TProcConst<string, int64>); overload;
@@ -361,6 +375,15 @@ type
     procedure Each(proc : TProcConst<string, IJSONObject>); overload;
     procedure Each(proc : TProcConst<string, IJSONArray>); overload;
     procedure Each(proc : TProcConst<string, Variant>); overload;
+
+    procedure Each(proc : TBreakableProc<string, PMultiValue>); overload;
+    procedure Each(proc : TBreakableProc<string, string>); overload;
+    procedure Each(proc : TBreakableProc<string, double>); overload;
+    procedure Each(proc : TBreakableProc<string, int64>); overload;
+    procedure Each(proc : TBreakableProc<string, boolean>); overload;
+    procedure Each(proc : TBreakableProc<string, IJSONObject>); overload;
+    procedure Each(proc : TBreakableProc<string, IJSONArray>); overload;
+    procedure Each(proc : TBreakableProc<string, Variant>); overload;
 
     procedure Add(const name : string; const value : string); overload;
     procedure Add(const name : string; const value : double); overload;
@@ -481,6 +504,8 @@ type
 
     function Query(const Path : string) : IJSONArray;
     procedure Update(JQL : string);
+
+    function PropertyNames(Sorted : boolean = false) : TArray<string>;
 
     procedure RaiseIfMissing(const PropertyNames : TArray<string>); overload;
     procedure RaiseIfMissing(const PropertyName : string); overload;
@@ -690,6 +715,17 @@ type
     procedure Each(proc : TProcConst<Variant>); overload;
     procedure Each(proc : TProcConst<PMultiValue>); overload;
 
+    procedure Each(proc : TBreakableProc<TGuid>); overload;
+    procedure Each(proc : TBreakableProc<TDateTime>); overload;
+    procedure Each(proc : TBreakableProc<string>); overload;
+    procedure Each(proc : TBreakableProc<double>); overload;
+    procedure Each(proc : TBreakableProc<int64>); overload;
+    procedure Each(proc : TBreakableProc<boolean>); overload;
+    procedure Each(proc : TBreakableProc<IJSONObject>); overload;
+    procedure Each(proc : TBreakableProc<IJSONArray>); overload;
+    procedure Each(proc : TBreakableProc<Variant>); overload;
+    procedure Each(proc : TBreakableProc<PMultiValue>); overload;
+
     procedure Add(const value : string); overload;
     procedure Add(const value : TGUID); overload;
     procedure Add(const value : double); overload;
@@ -848,12 +884,12 @@ type
 
 
   public  // IJSONObject
-    procedure Each(proc : TProcConst<string, PMultiValue>); overload;
     procedure Add(const name : string; const value : PMultiValue); overload;
     property Raw[const name : string] : PMultiValue read GetRaw write SetRaw;
     procedure Reload(const Source : string);
     procedure Clear;
 
+    procedure Each(proc : TProcConst<string, PMultiValue>); overload;
     procedure Each(proc : TProcConst<string, string>); overload;
     procedure Each(proc : TProcConst<string, double>); overload;
     procedure Each(proc : TProcConst<string, int64>); overload;
@@ -861,6 +897,15 @@ type
     procedure Each(proc : TProcConst<string, IJSONObject>); overload;
     procedure Each(proc : TProcConst<string, IJSONArray>); overload;
     procedure Each(proc : TProcConst<string, Variant>); overload;
+
+    procedure Each(proc : TBreakableProc<string, PMultiValue>); overload;
+    procedure Each(proc : TBreakableProc<string, string>); overload;
+    procedure Each(proc : TBreakableProc<string, double>); overload;
+    procedure Each(proc : TBreakableProc<string, int64>); overload;
+    procedure Each(proc : TBreakableProc<string, boolean>); overload;
+    procedure Each(proc : TBreakableProc<string, IJSONObject>); overload;
+    procedure Each(proc : TBreakableProc<string, IJSONArray>); overload;
+    procedure Each(proc : TBreakableProc<string, Variant>); overload;
 
     procedure Add(const name : string; const value : string); overload;
     procedure Add(const name : string; const value : double); overload;
@@ -961,6 +1006,8 @@ type
     function IsSimpleValue : boolean;
     function ValueType : TJSONValueType;
     function AsValue : TMultiValue;
+
+    function PropertyNames(Sorted : boolean = false) : TArray<string>;
 
     procedure RaiseIfMissing(const PropertyNames : TArray<string>); overload;
     procedure RaiseIfMissing(const PropertyName : string); overload;
@@ -1617,6 +1664,170 @@ var
 begin
   for i := 0 to FValues.Count-1 do
     proc(FValues[i].ObjectValue);
+end;
+
+procedure TJSONArrayImpl.Each(proc: TProcConst<PMultiValue>);
+var
+  i: Integer;
+begin
+  for i := 0 to FValues.Count-1 do
+    proc(FValues[i]);
+end;
+
+procedure TJSONArrayImpl.Each(proc: TProcConst<TDateTime>);
+var
+  i: Integer;
+begin
+  for i := 0 to FValues.Count-1 do
+    proc(ISO8601ToDate(strings[i]));
+end;
+
+procedure TJSONArrayImpl.Each(proc: TProcConst<TGuid>);
+var
+  i: Integer;
+begin
+  for i := 0 to FValues.Count-1 do
+    proc(StringToGuid(strings[i]));
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<int64>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(FValues[i].IntegerValue, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<double>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(FValues[i].NumberValue, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<string>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(strings[i], bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<boolean>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(FValues[i].IntegerValue <> 0, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<Variant>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(FValues[i].ToVariant, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<IJSONArray>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(FValues[i].ArrayValue, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<IJSONObject>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(FValues[i].ObjectValue, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<PMultiValue>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(FValues[i], bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<TDateTime>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(ISO8601ToDate(strings[i]), bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONArrayImpl.Each(proc: TBreakableProc<TGuid>);
+var
+  i: Integer;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for i := 0 to FValues.Count-1 do
+  begin
+    proc(StringToGuid(strings[i]), bContinue);
+    if not bContinue then
+      Break;
+  end;
 end;
 
 procedure TJSONArrayImpl.EndUpdates;
@@ -2493,30 +2704,6 @@ begin
   Add(value.ToString);
 end;
 
-procedure TJSONArrayImpl.Each(proc: TProcConst<PMultiValue>);
-var
-  i: Integer;
-begin
-  for i := 0 to FValues.Count-1 do
-    proc(FValues[i]);
-end;
-
-procedure TJSONArrayImpl.Each(proc: TProcConst<TDateTime>);
-var
-  i: Integer;
-begin
-  for i := 0 to FValues.Count-1 do
-    proc(ISO8601ToDate(strings[i]));
-end;
-
-procedure TJSONArrayImpl.Each(proc: TProcConst<TGuid>);
-var
-  i: Integer;
-begin
-  for i := 0 to FValues.Count-1 do
-    proc(StringToGuid(strings[i]));
-end;
-
 { TJSONArray }
 
 class function TJSONArray.From(const src: string): IJSONArray;
@@ -3250,18 +3437,146 @@ begin
     proc(item.Key, item.Value.ToVariant);
 end;
 
-procedure TJSONObject.EndUpdates;
-begin
-  FUpdating := False;
-  DoChangeNotify;
-end;
-
 procedure TJSONObject.Each(proc: TProcConst<string, PMultiValue>);
 var
   item : TPair<string, PMultiValue>;
 begin
   for item in FValues do
     proc(item.Key, item.Value);
+end;
+
+procedure TJSONObject.Each(proc: TProcConst<string, IJSONObject>);
+var
+  item : TPair<string, PMultiValue>;
+begin
+  for item in FValues do
+    proc(item.Key, item.Value.ObjectValue);
+end;
+
+procedure TJSONObject.Each(proc: TProcConst<string, IJSONArray>);
+var
+  item : TPair<string, PMultiValue>;
+begin
+  for item in FValues do
+    proc(item.Key, item.Value.ArrayValue);
+end;
+
+procedure TJSONObject.Each(proc: TBreakableProc<string, int64>);
+var
+  item : TPair<string, PMultiValue>;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for item in FValues do
+  begin
+    proc(item.Key, item.Value.IntegerValue, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONObject.Each(proc: TBreakableProc<string, boolean>);
+var
+  item : TPair<string, PMultiValue>;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for item in FValues do
+  begin
+    proc(item.Key, item.Value.IntegerValue <> 0, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONObject.Each(proc: TBreakableProc<string, string>);
+var
+  item : TPair<string, PMultiValue>;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for item in FValues do
+  begin
+    proc(item.Key, TJSON.Decode(item.Value.StringValue), bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONObject.Each(proc: TBreakableProc<string, double>);
+var
+  item : TPair<string, PMultiValue>;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for item in FValues do
+  begin
+    proc(item.Key, item.Value.NumberValue, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONObject.Each(proc: TBreakableProc<string, Variant>);
+var
+  item : TPair<string, PMultiValue>;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for item in FValues do
+  begin
+    proc(item.Key, item.Value.ToVariant, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONObject.Each(proc: TBreakableProc<string, PMultiValue>);
+var
+  item : TPair<string, PMultiValue>;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for item in FValues do
+  begin
+    proc(item.Key, item.Value, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONObject.Each(proc: TBreakableProc<string, IJSONObject>);
+var
+  item : TPair<string, PMultiValue>;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for item in FValues do
+  begin
+    proc(item.Key, item.Value.ObjectValue, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONObject.Each(proc: TBreakableProc<string, IJSONArray>);
+var
+  item : TPair<string, PMultiValue>;
+  bContinue : boolean;
+begin
+  bContinue := True;
+  for item in FValues do
+  begin
+    proc(item.Key, item.Value.ArrayValue, bContinue);
+    if not bContinue then
+      Break;
+  end;
+end;
+
+procedure TJSONObject.EndUpdates;
+begin
+  FUpdating := False;
+  DoChangeNotify;
 end;
 
 function TJSONObject.Equals(const obj: IJSONObject): boolean;
@@ -3313,22 +3628,6 @@ begin
       Result := o;
     end;
   end;
-end;
-
-procedure TJSONObject.Each(proc: TProcConst<string, IJSONObject>);
-var
-  item : TPair<string, PMultiValue>;
-begin
-  for item in FValues do
-    proc(item.Key, item.Value.ObjectValue);
-end;
-
-procedure TJSONObject.Each(proc: TProcConst<string, IJSONArray>);
-var
-  item : TPair<string, PMultiValue>;
-begin
-  for item in FValues do
-    proc(item.Key, item.Value.ArrayValue);
 end;
 
 function TJSONObject.GetArray(const name: string): IJSONArray;
@@ -3806,6 +4105,25 @@ begin
           end;
       end
     );
+end;
+
+function TJSONObject.PropertyNames(Sorted: boolean = false): TArray<string>;
+var
+  lst : TList<string>;
+  item : TPair<string, PMultiValue>;
+begin
+  lst := TList<string>.Create;
+  try
+    for item in FValues do
+    begin
+      lst.Add(item.Key);
+    end;
+    if Sorted then
+      lst.Sort;
+    Result := lst.ToArray;
+  finally
+    lst.Free;
+  end;
 end;
 
 function TJSONObject.Query(const Path: string): IJSONArray;
