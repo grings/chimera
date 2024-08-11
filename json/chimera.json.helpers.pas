@@ -90,6 +90,9 @@ begin
     begin
       prop := cxt.GetType(obj.ClassInfo).GetProperty(name);
 
+      if not Assigned(prop) then
+        exit;
+
       case RTTITypeToJSONType(prop.PropertyType.TypeKind) of
         TJSONValueType.String:
           begin
