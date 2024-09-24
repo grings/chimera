@@ -63,6 +63,7 @@ type
       FMessages : TQueue<IJSONObject>;
       FHandler : TMessageHandler<IJSONObject>;
       FEvent : TEvent;
+      FDestroying : boolean;
     protected
       procedure Subscribe;
       procedure Unsubscribe;
@@ -114,20 +115,34 @@ type
 
 implementation
 
+{$IFDEF USELOGGER}
+uses
+  ideal.logger;
+{$ELSE}
+uses
+  chimera.mocklogger;
+{$ENDIF}
+
 { TPubSubProducer }
 
 function TPubSubProducer.CanPublish: boolean;
 begin
   Result := True;
   if Assigned(FOnCanPublish) then
+  begin
+    TLogger.Profile('TPubSubProducer.CanPublish');
     FOnCanPublish(Self, Dispatcher.Request, ParseChannel, Result);
+  end;
 end;
 
 function TPubSubProducer.CanSubscribe: boolean;
 begin
   Result := True;
   if Assigned(FOnCanSubscribe) then
+  begin
+    TLogger.Profile('TPubSubProducer.CanSubscribe');
     FOnCanSubscribe(Self, Dispatcher.Request, ParseChannel, Result);
+  end;
 end;
 
 function TPubSubProducer.Content: string;
@@ -136,14 +151,17 @@ var
   i: Integer;
   jsa : IJSONArray;
 begin
+  TLogger.Profile('TPubSubProducer.Content '+Dispatcher.Request.Method);
   try
     case Dispatcher.Request.MethodType of
       TMethodType.mtPost,
       TMethodType.mtPut:
+      begin
         if CanPublish then
           PubSub.Publish(ParseChannel, ParseMessage, DoGetID)
         else
           raise EPubSubSecurityException.Create(NOT_ALLOWED);
+      end;
       TMethodType.mtGet:
       begin
         if CanSubscribe then
@@ -151,27 +169,35 @@ begin
           sSession := '';
           if Assigned(FOnSession) then
           begin
+            TLogger.Trace('TPubSubProducer.Content OnSession Assigned');
             // If a session is provided, then use queueing mechanism
             FOnSession(Self, Dispatcher.Request, Dispatcher.Response, sSession);
             jsa := TJSONArray.From<IJSONObject>(
                 PubSub.ListenAndWait(ParseChannel, sSession, FTimeout, DoGetID)
               );
+            TLogger.Trace('TPubSubProducer.Content Listen and wait returned '+jsa.AsJSON);
           end else
           begin
+            TLogger.Trace('TPubSubProducer.Content NO OnSession Assigned');
             // If no session provided, just wait for next message
             jsa := PersistentWaitForMessages(ParseChannel, DoGetID, FTimeout);
+            TLogger.Trace('TPubSubProducer.Content Persistent Wait returned '+jsa.AsJSON);
           end;
 
           Result := jsa.AsJSON;
           Dispatcher.Response.ContentType := 'application/json';
 
           if sSession <> '' then
+          begin
+            TLogger.Trace('TPubSubProducer.Content Clearing each response message for pubsub session');
             jsa.Each(
               procedure(const jsn: IJSONObject)
               begin
                 PubSub.ClearMsg(ParseChannel,sSession,jsn);
               end
             );
+            TLogger.Trace('TPubSubProducer.Content Finished Clearing each response message for pubsub session');
+          end;
         end else
           raise EPubSubSecurityException.Create(NOT_ALLOWED);
       end;
@@ -186,6 +212,7 @@ begin
   except
     on e: exception do
     begin
+      TLogger.Error(e, 'TPubSubProducer.Content Error');
       Dispatcher.Response.StatusCode := 501;
       Dispatcher.Response.ReasonString := e.Message;
       Result := e.Message;
@@ -221,7 +248,10 @@ function TPubSubProducer.DoGetID: string;
 begin
   Result := '';
   if Assigned(FOnGetID) then
+  begin
+    TLogger.Profile('TPubSubProducer.DoGetID');
     FOnGetID(Self, Dispatcher.Request, Dispatcher.Response, Result);
+  end;
 end;
 
 function TPubSubProducer.GenerateKey(const Channel, ID: string): string;
@@ -231,6 +261,7 @@ end;
 
 function TPubSubProducer.ParseChannel: string;
 begin
+  TLogger.Profile('TPubSubProducer.ParseChannel');
   Result := String(Dispatcher.Request.PathInfo);
   if Assigned(FOnParseChannel) then
     FOnParseChannel(Self, Dispatcher.Request, Result);
@@ -238,13 +269,15 @@ end;
 
 function TPubSubProducer.ParseMessage : IJSONObject;
 begin
-  Result := JSON(Dispatcher.Request.Content);
+  TLogger.Profile('TPubSubProducer.ParseMessage');
+  Result := TJSON.From(Dispatcher.Request.Content);
   if Assigned(FOnParseMessage) then
     FOnParseMessage(Self, Dispatcher.Request, Result);
 end;
 
 function TPubSubProducer.PersistentUnsubscribe(const Channel, ID: string): boolean;
 begin
+  TLogger.Profile('TPubSubProducer.PersistentUnsubscribe('+Channel+', '+ID+')');
   var key := GenerateKey(Channel, ID);
   FSubsCS.BeginRead;
   try
@@ -273,6 +306,7 @@ end;
 
 class procedure TPubSubProducer.UnsubscribeAll;
 begin
+  TLogger.Profile('TPubSubProducer.UnsubscribeAll');
   FSubsCS.BeginWrite;
   try
     for var p in FSubscriptions.ToArray do
@@ -289,34 +323,45 @@ function TPubSubProducer.PersistentWaitForMessages(const Channel, ID: string; Ti
 var
   sub : TSubscription;
 begin
-  sub := nil;
-  var key := GenerateKey(Channel, ID);
-
-  FSubsCS.BeginRead;
+  TLogger.Profile('TPubSubProducer.PersistentWaitForMessages('+Channel+', '+ID+', '+TImeout.ToString);
   try
-    if not FSubscriptions.TryGetValue(key, sub) then
-    begin
-      sub := TSubscription.Create(Channel, ID);
-      FSubsCS.BeginWrite;
-      try
-        var sub2 := sub;
-        if not FSubscriptions.TryGetValue(key, sub) then
-        begin
-          FSubscriptions.Add(key, sub2);
-          sub := sub2;
-        end else
-          sub2.Free;
-      finally
-        FSubsCS.EndWrite;
-      end;
-    end;
-  finally
-    FSubsCS.EndRead;
-  end;
+    sub := nil;
+    var key := GenerateKey(Channel, ID);
 
-  if Assigned(sub) then
-  begin
-    Result := sub.ExtractMessages(Timeout);
+    FSubsCS.BeginRead;
+    try
+      if not FSubscriptions.TryGetValue(key, sub) then
+      begin
+        sub := TSubscription.Create(Channel, ID);
+        FSubsCS.BeginWrite;
+        try
+          var sub2 := sub;
+          if not FSubscriptions.TryGetValue(key, sub) then
+          begin
+            FSubscriptions.Add(key, sub2);
+            sub := sub2;
+          end else
+            sub2.Free;
+        finally
+          FSubsCS.EndWrite;
+        end;
+      end;
+    finally
+      FSubsCS.EndRead;
+    end;
+
+    if Assigned(sub) then
+    begin
+      TLogger.Trace('Assigned sub');
+      Result := sub.ExtractMessages(Timeout);
+    end;
+  except
+    on E: Exception do
+    begin
+      TLogger.Error(E);
+      raise;
+    end;
+
   end;
 end;
 
@@ -325,6 +370,7 @@ end;
 constructor TPubSubProducer.TSubscription.Create(const AChannel, AID : string);
 begin
   inherited Create;
+  FDestroying := False;
   FCS := TMultiReadExclusiveWriteSynchronizer.Create;
   FID := AID;
   FChannel := AChannel;
@@ -346,6 +392,9 @@ end;
 
 destructor TPubSubProducer.TSubscription.Destroy;
 begin
+  FDestroying := True;
+  FEvent.SetEvent;
+  Sleep(10);
   Unsubscribe;
   FEvent.Free;
   FMessages.Free;
@@ -359,38 +408,61 @@ var
   bNeedToWait : boolean;
   bHasData : boolean;
 begin
-  Result := TJSONArray.New;
-  bHasData := False;
-
-  FCS.BeginRead;
+  if FDestroying then
+    exit;
+  TLogger.Profile('TPubSubProducer.TSubscription.ExtractMessages '+Timeout.ToString);
   try
-    bNeedToWait := FMessages.Count = 0;
-  finally
-    FCS.EndRead;
-  end;
+    Result := TJSONArray.New;
+    bHasData := False;
 
-
-  if bNeedToWait then
-    bHasData := FEvent.WaitFor(Timeout) = wrSignaled
-  else
-    bHasData := True;
-
-  if bHasData then
-  begin
-
-    FCS.BeginWrite;
+    FCS.BeginRead;
     try
-      while FMessages.Count > 0 do
-        Result.Add(FMessages.Dequeue);
+      bNeedToWait := FMessages.Count = 0;
     finally
-      FCS.EndWrite;
+      FCS.EndRead;
+    end;
+    TLogger.Trace('bNeedToWait = '+BoolToStr(bNeedToWait, True));
+
+    if bNeedToWait then
+      bHasData := FEvent.WaitFor(Timeout) = wrSignaled
+    else
+      bHasData := True;
+
+    if FDestroying then
+    begin
+      TLogger.Trace('TPubSubProducer.TSubscription.ExtractMessages Exiting Early due to signal during destruction.');
+      exit;
+    end;
+
+    if bHasData then
+    begin
+      TLogger.Trace('bHasData is True after signal');
+      FCS.BeginWrite;
+      try
+        while FMessages.Count > 0 do
+          Result.Add(FMessages.Dequeue);
+      finally
+        FCS.EndWrite;
+      end;
+    end else
+      TLogger.Trace('bHasData is False after signal');
+
+    TLogger.Trace('Resetting Event');
+    FEvent.ResetEvent;
+  except
+    on E: Exception do
+    begin
+      TLogger.Error(E);
+      raise;
     end;
   end;
-  FEvent.ResetEvent;
 end;
 
 procedure TPubSubProducer.TSubscription.Subscribe;
 begin
+  if FDestroying then
+    exit;
+  TLogger.Profile('TPubSubProducer.TSubscription.Subscribe');
   PubSub.Subscribe(
     FChannel,
     FHandler,
@@ -400,6 +472,7 @@ end;
 
 procedure TPubSubProducer.TSubscription.Unsubscribe;
 begin
+  TLogger.Profile('TPubSubProducer.TSubscription.Unsubscribe');
   PubSub.Unsubscribe(FChannel, FHandler, FID);
 end;
 

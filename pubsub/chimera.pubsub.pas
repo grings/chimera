@@ -117,6 +117,13 @@ type
 
 implementation
 
+{$IFDEF USELOGGER}
+uses
+  ideal.logger;
+{$ELSE}
+uses
+  chimera.mocklogger;
+{$ENDIF}
 
 { TPubSub<T> }
 
@@ -196,22 +203,32 @@ var
   event : TEvent;
   msgResult : T;
 begin
-  event := TEvent.Create;
+  TLogger.Profile('TPubSub<T>.ListenAndWait '+Channel+' '+Timeout.ToString+' '+ID);
   try
-    Lookup(Channel).Subscribe(
-      procedure(const Msg : T)
+    event := TEvent.Create;
+    try
+      Lookup(Channel).Subscribe(
+        procedure(const Msg : T)
+        begin
+          MsgResult := Msg;
+          event.SetEvent;
+        end
+      , ID);
+      if event.WaitFor(Timeout) = TWaitResult.wrSignaled then
       begin
-        MsgResult := Msg;
-        event.SetEvent;
-      end
-    , ID);
-    if event.WaitFor(Timeout) = TWaitResult.wrSignaled then
+        result := msgResult;
+      end else
+        Result := Default(T);
+    finally
+      event.Free;
+    end;
+  except
+    on e: Exception do
     begin
-      result := msgResult;
-    end else
-      Result := Default(T);
-  finally
-    event.Free;
+      TLogger.Error(E);
+      raise;
+    end;
+
   end;
 end;
 
@@ -236,16 +253,19 @@ end;
 
 procedure TPubSub<T>.Publish(const Channel: string; const Msg: T; const ID : string = '');
 begin
+  TLogger.Profile('TPubSub<T>.Publish '+Channel+' '+ID);
   Lookup(Channel).Publish(Msg, ID);
 end;
 
 procedure TPubSub<T>.Subscribe(const Channel: string; Handler: TMessageHandler<T>; const ID : string = '');
 begin
+  TLogger.Profile('TPubSub<T>.Subscribe '+Channel+' '+ID);
   Lookup(Channel).Subscribe(Handler, ID);
 end;
 
 procedure TPubSub<T>.Unsubscribe(const Channel: string; Handler: TMessageHandler<T>; const ID : string = '');
 begin
+  TLogger.Profile('TPubSub<T>.Unsubscribe '+Channel+' '+ID);
   Lookup(Channel).Unsubscribe(Handler, ID);
 end;
 
@@ -375,55 +395,83 @@ var
   p : TPair<string, TDataContext<T>>;
   ph: TPair<string, TMessageHandler<T>>;
 begin
-  TMonitor.Enter(Self);
+  TLogger.Profile('TPubSub<T>.TChannel<T>.Publish '+ID);
   try
-    FOwner.DoStoreMessage(Self,'',Msg);
-    for h in FSubscriptions do
-    begin
-      h(Msg);
-    end;
-    for ph in FIDSubscriptions do
-    begin
-      ph.Value(Msg);
-    end;
+    TMonitor.Enter(Self);
+    try
+      FOwner.DoStoreMessage(Self,'',Msg);
+      for h in FSubscriptions do
+      begin
+        h(Msg);
+      end;
+      for ph in FIDSubscriptions do
+      begin
+        ph.Value(Msg);
+      end;
 
-   // if (FContexts.Count > 1) OR ((FContexts.Count = 1) AND (NOT FContexts.ContainsKey(''))) then
-   //   FOwner.DoClearMessage(Self,'',Msg);
-    for p in FContexts do
-    begin
-      p.Value.Enqueue(Msg);
-      if p.Key <> '' then
-        FOwner.DoStoreMessage(Self,p.Key,Msg);
-      p.Value.Event.SetEvent;
+     // if (FContexts.Count > 1) OR ((FContexts.Count = 1) AND (NOT FContexts.ContainsKey(''))) then
+     //   FOwner.DoClearMessage(Self,'',Msg);
+      for p in FContexts do
+      begin
+        p.Value.Enqueue(Msg);
+        if p.Key <> '' then
+          FOwner.DoStoreMessage(Self,p.Key,Msg);
+        p.Value.Event.SetEvent;
+      end;
+    finally
+      TMonitor.Exit(Self);
     end;
-  finally
-    TMonitor.Exit(Self);
+  except
+    on E: Exception do
+    begin
+      TLogger.Error(E);
+      raise;
+    end;
   end;
 end;
 
 procedure TPubSub<T>.TChannel<T>.Subscribe(Handler: TMessageHandler<T>; const ID : string = '');
 begin
-  TMonitor.Enter(Self);
+  TLogger.Profile('TPubSub<T>.TChannel<T>.Subscribe '+ID);
   try
-    if ID <> '' then
-      FIDSubscriptions.AddOrSetValue(ID, Handler)
-    else
-      FSubscriptions.Add(Handler);
-  finally
-    TMonitor.Exit(Self);
+    TMonitor.Enter(Self);
+    try
+      if ID <> '' then
+        FIDSubscriptions.AddOrSetValue(ID, Handler)
+      else
+        FSubscriptions.Add(Handler);
+    finally
+      TMonitor.Exit(Self);
+    end;
+  except
+    on E: Exception do
+    begin
+      TLogger.Error(E);
+      raise;
+    end;
   end;
 end;
 
 procedure TPubSub<T>.TChannel<T>.Unsubscribe(Handler: TMessageHandler<T>; const ID : string = '');
 begin
-  TMonitor.Enter(Self);
+  TLogger.Profile('TPubSub<T>.TChannel<T>.Unsubscribe '+ID);
   try
-    if (ID = '') and FSubscriptions.Contains(Handler) then
-      FSubscriptions.Remove(Handler)
-    else
-      FIDSubscriptions.ExtractPair(ID);
-  finally
-    TMonitor.Exit(Self);
+    TMonitor.Enter(Self);
+    try
+      if (ID = '') and FSubscriptions.Contains(Handler) then
+        FSubscriptions.Remove(Handler)
+      else
+        FIDSubscriptions.ExtractPair(ID);
+    finally
+      TMonitor.Exit(Self);
+    end;
+  except
+    on E: Exception do
+    begin
+      TLogger.Error(E);
+      raise;
+    end;
+
   end;
 end;
 
@@ -434,6 +482,7 @@ var
   cnt : Integer;
   i: Integer;
 begin
+  TLogger.Profile('TPubSub<T>.TChannel<T>.WaitOnContext '+Context+' '+Timeout.ToString+' '+ID);
   q := BeginAndGetContext(Context);
   TMonitor.Enter(q);
   try
@@ -443,6 +492,7 @@ begin
   end;
   if cnt = 0 then
   begin
+    TLogger.Trace('TPubSub<T>.TChannel<T>.WaitOnContext - no messages, time to wait');
     if q is TDataContext<T> then
     begin
       dc := TDataContext<T>(q);
@@ -453,6 +503,7 @@ begin
   TMonitor.Enter(q);
   try
     i := 0;
+    TLogger.Trace('TPubSub<T>.TChannel<T>.WaitOnContext - Returning '+q.Count.ToString+' Messages');
     setlength(Result, q.Count);
     while q.Count > 0 do
     begin
