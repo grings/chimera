@@ -169,6 +169,7 @@ type
     procedure Add(const value : IJSONObject); overload;
     procedure Add(const value : Variant); overload;
     procedure Add(const value : TArray<Byte>); overload;
+    procedure Add(const value : TStream; Position : Int64 = -1; Size : Int64 = -1); overload;
     procedure AddNull;
     procedure AddCode(const value : string);
     procedure Merge(const &Array : IJSONArray);
@@ -393,6 +394,7 @@ type
     procedure Add(const name : string; const value : IJSONObject); overload;
     procedure Add(const name : string; const value : Variant); overload;
     procedure Add(const name : string; const value : TArray<Byte>); overload;
+    procedure Add(const name : string; const value : TStream; Position : Int64 = -1; Size : Int64 = -1); overload;
     procedure Remove(const name : string);
     procedure AddNull(const name : string);
     procedure AddCode(const name : string; const value : string);
@@ -735,6 +737,7 @@ type
     procedure Add(const value : IJSONObject); overload;
     procedure Add(const value : Variant); overload;
     procedure Add(const value : TArray<Byte>); overload;
+    procedure Add(const value : TStream; Position : Int64 = -1; Size : Int64 = -1); overload;
     procedure AddNull;
     procedure AddCode(const value : string);
     procedure Merge(const &Array : IJSONArray);
@@ -915,6 +918,7 @@ type
     procedure Add(const name : string; const value : IJSONObject); overload;
     procedure Add(const name : string; const value : Variant); overload;
     procedure Add(const name : string; const value : TArray<Byte>); overload;
+    procedure Add(const name : string; const value : TStream; Position : Int64 = -1; Size : Int64 = -1); overload;
     procedure AddNull(const name : string);
     procedure AddCode(const name : string; const value : string);
 
@@ -2702,6 +2706,29 @@ end;
 procedure TJSONArrayImpl.Add(const value: TGUID);
 begin
   Add(value.ToString);
+end;
+
+procedure TJSONArrayImpl.Add(const value: TStream; Position, Size: Int64);
+var
+  stream : TBytesStream;
+  cnt : Int64;
+begin
+  if not (value is TBytesStream) then
+  begin
+    stream := TBytesStream.Create;
+    try
+      if position >= 0 then
+        value.Position := position;
+      cnt := Size;
+      if cnt < 0 then
+        cnt := 0;
+      stream.CopyFrom(value, cnt);
+      Add(stream.Bytes);
+    finally
+      stream.Free;
+    end;
+  end else
+    Add(TBytesStream(Value).Bytes);
 end;
 
 { TJSONArray }
@@ -4535,6 +4562,29 @@ end;
 procedure TJSONObject.Add(const name: string; const value: TArray<Byte>);
 begin
   Add(name, TEncoding.UTF8.GetString(TNetEncoding.Base64.Encode(Value)));
+end;
+
+procedure TJSONObject.Add(const name: string; const value: TStream; Position, Size: Int64);
+var
+  stream : TBytesStream;
+  cnt : Int64;
+begin
+  if not (value is TBytesStream) then
+  begin
+    stream := TBytesStream.Create;
+    try
+      if position >= 0 then
+        value.Position := position;
+      cnt := Size;
+      if cnt < 0 then
+        cnt := 0;
+      stream.CopyFrom(value, cnt);
+      Add(name, stream.Bytes);
+    finally
+      stream.Free;
+    end;
+  end else
+    Add(name, TBytesStream(Value).Bytes);
 end;
 
 { TMultiValue }
