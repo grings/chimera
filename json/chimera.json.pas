@@ -528,6 +528,8 @@ type
   public
     class constructor Create;
 
+    class function ContentType : string;
+
     class function New : IJSONObject; overload;
     class function New(SetupNewObject : TChangeObjectHandler) : IJSONObject; overload;
     class function From(const src : string = '') : IJSONObject; overload;
@@ -1242,6 +1244,11 @@ end;
 function JSONDecode(const str : string) : string;
 begin
   Result := TJSON.Decode(str);
+end;
+
+class function TJSON.ContentType: string;
+begin
+  result := 'application/javascript';
 end;
 
 class constructor TJSON.Create;
