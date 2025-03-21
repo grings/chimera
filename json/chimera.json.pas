@@ -394,6 +394,11 @@ type
     procedure Add(const name : string; const value : IJSONObject); overload;
     procedure Add(const name : string; const value : Variant); overload;
     procedure Add(const name : string; const value : TArray<Byte>); overload;
+    procedure Add(const name : string; const value : TArray<String>); overload;
+    procedure Add(const name : string; const value : TArray<Double>); overload;
+    procedure Add(const name : string; const value : TArray<Boolean>); overload;
+    procedure Add(const name : string; const value : TArray<Integer>); overload;
+    procedure Add(const name : string; const value : TArray<Int64>); overload;
     procedure Add(const name : string; const value : TStream; Position : Int64 = -1; Size : Int64 = -1); overload;
     procedure Remove(const name : string);
     procedure AddNull(const name : string);
@@ -920,6 +925,11 @@ type
     procedure Add(const name : string; const value : IJSONObject); overload;
     procedure Add(const name : string; const value : Variant); overload;
     procedure Add(const name : string; const value : TArray<Byte>); overload;
+    procedure Add(const name : string; const value : TArray<String>); overload;
+    procedure Add(const name : string; const value : TArray<Double>); overload;
+    procedure Add(const name : string; const value : TArray<Boolean>); overload;
+    procedure Add(const name : string; const value : TArray<Integer>); overload;
+    procedure Add(const name : string; const value : TArray<Int64>); overload;
     procedure Add(const name : string; const value : TStream; Position : Int64 = -1; Size : Int64 = -1); overload;
     procedure AddNull(const name : string);
     procedure AddCode(const name : string; const value : string);
@@ -4592,6 +4602,31 @@ begin
     end;
   end else
     Add(name, TBytesStream(Value).Bytes);
+end;
+
+procedure TJSONObject.Add(const name: string; const value: TArray<String>);
+begin
+   Add(name, TJSONArray.From<string>(Value));
+end;
+
+procedure TJSONObject.Add(const name: string; const value: TArray<Double>);
+begin
+   Add(name, TJSONArray.From<Double>(Value));
+end;
+
+procedure TJSONObject.Add(const name: string; const value: TArray<Boolean>);
+begin
+   Add(name, TJSONArray.From<Boolean>(Value));
+end;
+
+procedure TJSONObject.Add(const name: string; const value: TArray<Integer>);
+begin
+   Add(name, TJSONArray.From<Integer>(Value));
+end;
+
+procedure TJSONObject.Add(const name: string; const value: TArray<Int64>);
+begin
+   Add(name, TJSONArray.From<Int64>(Value));
 end;
 
 { TMultiValue }
