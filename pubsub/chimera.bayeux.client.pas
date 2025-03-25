@@ -114,7 +114,6 @@ type
     FOnSubscribeError: TErrorHandler;
     ResubPingerThread: TThread;
     function DoAuthenticate(var Username : string; var Password : string) : boolean;
-    //procedure DoHandshake;
     procedure AuthCallback(const Sender: TObject; AnAuthTarget: TAuthTargetType;
       const ARealm, AURL: string; var AUserName, APassword: string; var AbortAuth: Boolean;
       var Persistence: TAuthPersistenceType);
@@ -141,7 +140,6 @@ type
     procedure DoLogVerbose(const Msg: string);
 
 
-    //function HandshakeChecker :Boolean; virtual;
 
   public
     constructor Create(const Endpoint : string; DeferConnect : boolean = false;
@@ -357,28 +355,7 @@ begin
   end;
 end;
 
-{procedure TBayeuxClient.DoHandshake;
-begin
-  TThread.CreateAnonymousThread(
-    procedure
-    var
-      http : THTTPClient;
-    begin
-      http := THTTPClient.Create;
-      try
-        SetupHTTP(http);
 
-        Handshake(http);
-
-        SynchronizeCookies(http);
-      finally
-        if Assigned(http.CookieManager) then
-          http.CookieManager.Free;
-        http.Free;
-      end;
-    end
-  ).Start;
-end;}
 
 procedure TBayeuxClient.DoLogVerbose(const Msg : string);
 begin
@@ -386,12 +363,6 @@ begin
     FOnLogVerbose('[TBayeuxClient] ' + Msg);
 end;
 
-(*function TBayeuxClient.HandshakeChecker :Boolean;
-begin
-  Result := (FHandshakeSuccessCount>0);
-  DoLogVerbose('TBayeuxClient.HandshakeChecker '+BoolToStr(Result));
-end;
-*)
 
 function TBayeuxClient.DoSendMessage(http: THTTPClient; const Msg: IJSONObject) : IJSONObject;
   function ProcessAsObject(ss : TStringStream) : IJSONObject;
@@ -932,75 +903,6 @@ begin
   );
 end;
 
-(*
-procedure TBayeuxClient.Subscribe(const Channel: string;
-  const OnMessage: TMessageHandler);
-var
-  LHTTP: THTTPClient;
-begin
-  FDispatcherCS.BeginWrite;
-  try
-    FDispatcher.AddOrSetValue(Channel, TSubHandler.Create(OnMessage));
-  finally
-    FDIspatcherCS.EndWrite;
-  end;
-  StartListener(
-    procedure
-    var
-      jso : IJSONObject;
-    begin
-      jso := JSON;
-      jso.Strings['clientId'] := ClientID;
-      jso.Strings['channel'] := META_SUBSCRIBE;
-      jso.Strings['subscription'] := Channel;
-      if Assigned(FExtension) then
-        jso.Objects['ext'] := FExtension;
-
-      if not HandshakeChecker then
-            DoLogVerbose('SendMessage of META_SUBSCRIBE STARTING before handshake');
-
-      SendMessage(jso,
-        procedure(const channel, error : string)
-        begin
-          DoLogVerbose('[TBayeuxClient.Subscribe] SendMessage(..., procedure): Channel: '+channel+' Error: '+error);
-
-          if (error.startsWith('401:') and (error.toUpper.Contains('UNKNOWN CLIENT'))) then
-          begin
-            DoLogVerbose('Recovery Logic Begins');
-            //if UNKNOWN CLIENT, unsubscribe, clear out client id, initiate a new handshake to get new client id, and then subscribe using this new client id
-            Unsubscribe(Channel);
-            DoLogVerbose('Recovery Logic After Unsubscribe '+Channel);
-
-            ClientId := '';
-            LHTTP := THTTPClient.Create;
-            try
-              SetupHTTP(LHTTP);
-              DoLogVerbose('Before Handshake');
-              if Handshake(LHTTP) then
-              begin
-                jso.Strings['clientId'] := ClientID; //new clientid
-                SendMessage(jso, procedure(const channel, error: string)
-                begin
-                  Unsubscribe(Channel);
-                  DoLogVerbose('Error trying to subscribe to channel '+channel+' after retrying handshake to get new client id: '+error);
-                end)
-              end
-              else
-               DoLogVerbose('Die');
-            finally
-              LHTTP.Free;
-            end;
-          end
-          else
-          if (not error.startsWith('401:')) or
-             (error.startsWith('401:') and (not error.toUpper.Contains('UNKNOWN CLIENT'))) then
-            Unsubscribe(Channel);
-        end
-      );
-    end
-  );
-end;
-*)
 
 procedure TBayeuxClient.Subscribe(const Channel: string;
   const OnMessage: TMessageHandler);
@@ -1023,8 +925,6 @@ begin
       if Assigned(FExtension) then
         jso.Objects['ext'] := FExtension;
 
-//      if not HandshakeChecker then
-//            DoLogVerbose('SendMessage of META_SUBSCRIBE STARTING before handshake');
 
       SendMessage(jso,
         procedure(const channel, error : string)
@@ -1061,7 +961,7 @@ procedure TBayeuxClient.Unsubscribe(const Channel: string);
 begin
 {$ifdef BAYEUX_VERBOSE_TRACE}
   DoLogVerbose('TBayeuxClient.Unsubscribe '+Channel);
-  {$endif}
+{$endif}
 
 
   StartListener(
