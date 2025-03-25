@@ -114,7 +114,6 @@ type
     FOnSubscribeError: TErrorHandler;
     ResubPingerThread: TThread;
     function DoAuthenticate(var Username : string; var Password : string) : boolean;
-    //procedure DoHandshake;
     procedure AuthCallback(const Sender: TObject; AnAuthTarget: TAuthTargetType;
       const ARealm, AURL: string; var AUserName, APassword: string; var AbortAuth: Boolean;
       var Persistence: TAuthPersistenceType);
@@ -140,7 +139,7 @@ type
 
     procedure DoLogVerbose(const Msg: string);
 
-    function HandshakeChecker :Boolean; virtual;
+
 
   public
     constructor Create(const Endpoint : string; DeferConnect : boolean = false;
@@ -356,28 +355,7 @@ begin
   end;
 end;
 
-{procedure TBayeuxClient.DoHandshake;
-begin
-  TThread.CreateAnonymousThread(
-    procedure
-    var
-      http : THTTPClient;
-    begin
-      http := THTTPClient.Create;
-      try
-        SetupHTTP(http);
 
-        Handshake(http);
-
-        SynchronizeCookies(http);
-      finally
-        if Assigned(http.CookieManager) then
-          http.CookieManager.Free;
-        http.Free;
-      end;
-    end
-  ).Start;
-end;}
 
 procedure TBayeuxClient.DoLogVerbose(const Msg : string);
 begin
@@ -385,14 +363,6 @@ begin
     FOnLogVerbose('[TBayeuxClient] ' + Msg);
 end;
 
-function TBayeuxClient.HandshakeChecker :Boolean;
-begin
-  Result := (FHandshakeSuccessCount>0);
-
-  DoLogVerbose('TBayeuxClient.HandshakeChecker '+BoolToStr(Result));
-
-
-end;
 
 function TBayeuxClient.DoSendMessage(http: THTTPClient; const Msg: IJSONObject) : IJSONObject;
   function ProcessAsObject(ss : TStringStream) : IJSONObject;
@@ -638,17 +608,22 @@ procedure TBayeuxClient.ProcessResponseObject(const obj: IJSONObject);
   begin
     if advice.Has['reconnect'] then
     begin
+
       s := advice.Strings['reconnect'];
+      DoLogVerbose('advice.reconnect = "'+s+'"');
       if s = 'retry' then
         FRetryMode := TRetryMode.retry
       else if s = 'handshake' then
-        FRetryMode := TRetryMode.handshake
+        FRetryMode := TRetryMode.handshake    // we treat this like the advice we received even if this isn't set.
       else
         FRetryMode := TRetryMode.none;
     end;
 
     if advice.Has['timeout'] then
+    begin
+      DoLogVerbose('advice.timeout');
       FTimeout := advice.Integers['timeout'];
+    end;
 
     if advice.Has['interval'] then
       FInterval := advice.Integers['interval'];
@@ -774,9 +749,6 @@ var
   p : TPair<string, ISubHandler>;
   ary : TArray<TPair<string, ISubHandler>>;
 begin
-  if not Self.HandshakeChecker then
-        raise EBayeuxException.Create('Cannot resubscribe while handshaking');
-
 
   FDispatcherCS.BeginRead;
   try
@@ -855,12 +827,24 @@ begin
       if FClientID <> Value then
       begin
         sOldID := FClientID;
+        DoLogVerbose('SetClientID: old clientid '+FClientID);
+        DoLogVerbose('SetClientID: new clientid '+Value);
+
         FClientID := Value;
-        if (Value <> '') then
-            if HandshakeChecker then
-                Resubscribe;
+        if (Value <> '') then // when setting Value non black and FClientID is different or blank then.... (client id change)
+        begin
+            DoLogVerbose('SetClientID: Forcing resubscribe');
+            Resubscribe;
+        end;
+
         if Assigned(FOnClientIDChanged) then
+        begin
           FOnClientIDChanged(sOldID, Value);
+          DoLogVerbose('After OnClientIDChanged');
+        end
+        else
+          DoLogVerbose('Skip OnClientIDChanged');
+
       end;
     finally
       FClientIDCS.EndWrite;
@@ -911,10 +895,9 @@ begin
   );
 end;
 
+
 procedure TBayeuxClient.Subscribe(const Channel: string;
   const OnMessage: TMessageHandler);
-var
-  LHTTP: THTTPClient;
 begin
   FDispatcherCS.BeginWrite;
   try
@@ -934,43 +917,22 @@ begin
       if Assigned(FExtension) then
         jso.Objects['ext'] := FExtension;
 
-      if not HandshakeChecker then
-            DoLogVerbose('SendMessage of META_SUBSCRIBE STARTING before handshake');
 
       SendMessage(jso,
         procedure(const channel, error : string)
         begin
-          DoLogVerbose('[TBayeuxClient.Subscribe] SendMessage(..., procedure): Channel: '+channel+' Error: '+error);
-          if (error.startsWith('401:') and (error.toUpper.Contains('UNKNOWN CLIENT'))) then
-          begin
-            //if UNKNOWN CLIENT, unsubscribe, clear out client id, initiate a new handshake to get new client id, and then subscribe using this new client id
-            Unsubscribe(Channel);
-            ClientId := '';
-            LHTTP := THTTPClient.Create;
-            try
-              SetupHTTP(LHTTP);
-              if Handshake(LHTTP) then
-              begin
-                jso.Strings['clientId'] := ClientID; //new clientid
-                SendMessage(jso, procedure(const channel, error: string)
-                begin
-                  Unsubscribe(Channel);
-                  DoLogVerbose('Error trying to subscribe to channel '+channel+' after retrying handshake to get new client id: '+error);
-                end)
-              end;
-            finally
-              LHTTP.Free;
-            end;
-          end
-          else
           if (not error.startsWith('401:')) or
              (error.startsWith('401:') and (not error.toUpper.Contains('UNKNOWN CLIENT'))) then
-            Unsubscribe(Channel);
+           // Unsubscribe(Channel);
+           DoLogVerbose('ReSubscribe should start now');
+           ClientID := '';
+
         end
       );
     end
   );
 end;
+
 
 procedure TBayeuxClient.SynchronizeCookies(http: THTTPClient);
 begin
@@ -991,7 +953,7 @@ procedure TBayeuxClient.Unsubscribe(const Channel: string);
 begin
 {$ifdef BAYEUX_VERBOSE_TRACE}
   DoLogVerbose('TBayeuxClient.Unsubscribe '+Channel);
-  {$endif}
+{$endif}
 
 
   StartListener(
