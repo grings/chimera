@@ -749,9 +749,6 @@ var
   p : TPair<string, ISubHandler>;
   ary : TArray<TPair<string, ISubHandler>>;
 begin
-//  if not Self.HandshakeChecker then
-//        raise EBayeuxException.Create('Cannot resubscribe while handshaking');
-
 
   FDispatcherCS.BeginRead;
   try
@@ -836,13 +833,8 @@ begin
         FClientID := Value;
         if (Value <> '') then // when setting Value non black and FClientID is different or blank then.... (client id change)
         begin
-            //if HandshakeChecker then
-            //begin
-                DoLogVerbose('SetClientID: Forcing resubscribe');
-                Resubscribe;
-            //end
-            //else
-            //   DoLogVerbose('HandshakeChecker returned false, not resubscribing');
+            DoLogVerbose('SetClientID: Forcing resubscribe');
+            Resubscribe;
         end;
 
         if Assigned(FOnClientIDChanged) then
