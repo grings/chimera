@@ -1136,16 +1136,6 @@ begin
 end;
 
 class function TJSON.Format(const src : string; Indent : Byte = PRETTY_PRINT_SPACING) : string;
-  function Spaces(iLevel : NativeUInt; indent : byte) : string;
-  var
-    i: Integer;
-    Size: NativeUInt;
-  begin
-    Size := (iLevel*Indent);
-    setlength(result,Size);
-    for i := 1 to Size do
-      Result[i] := ' ';
-  end;
 var
   src_len, i, iLevel : NativeUInt;
   sb : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder;
@@ -1185,7 +1175,7 @@ begin
             begin
               Inc(iLevel);
               sb.Append(sLineBreak);
-              sb.Append(Spaces(iLevel, Indent));
+              sb.Append(String.Create(' ',iLevel*Indent));
             end;
           end;
           
@@ -1193,7 +1183,7 @@ begin
           begin
             sb.Append(c);
             sb.Append(sLineBreak);
-            sb.Append(Spaces(iLevel, Indent));
+            sb.Append(String.Create(' ',iLevel*Indent));
           end;
           
           ':':
@@ -1208,7 +1198,7 @@ begin
             begin
               Dec(iLevel);
               sb.Append(sLineBreak);
-              sb.Append(Spaces(iLevel, Indent));
+              sb.Append(String.Create(' ',iLevel * Indent));
             end;
             sb.Append(c);
           end;
@@ -1590,43 +1580,37 @@ end;
 procedure TJSONArrayImpl.AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace; var Indent : integer);
 var
   i: Integer;
-  sb : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder;
+  HasItems : boolean;
 begin
-  if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
-    sb := {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder.Create
-  else
-    sb := Result;
-  try
-    sb.Append('[');
+  Result.Append('[');
+  HasItems := False;
 
-    if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
-    begin
-      inc(Indent, PRETTY_PRINT_SPACING);
-      sb.AppendLine.Append(String.create(' ',Indent));
-    end;
 
-    for i := 0 to FValues.Count-1 do
+  for i := 0 to FValues.Count-1 do
+  begin
+    if not HasItems then
     begin
-      if i > 0 then
-        sb.Append(WhiteChar(',', Whitespace));
-      FValues[i].AsJSON(sb, Whitespace, Indent);
+      if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
+      begin
+        inc(Indent, PRETTY_PRINT_SPACING);
+        Result.AppendLine.Append(String.create(' ',Indent));
+      end;
+      HasItems := True;
     end;
-    if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
-    begin
-      sb.AppendLine;
-      dec(Indent, PRETTY_PRINT_SPACING);
-      sb.Append(String.create(' ',Indent));
-    end;
-    sb.Append(']');
-
-    if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
-    begin
-      Result.Append(TJSON.Format(sb.ToString)); // TODO, think this is not necessary now with Indent property
-    end;
-  finally
-    if sb <> Result then
-      sb.Free;
+    if i > 0 then
+      Result.Append(WhiteChar(',', Whitespace));
+    FValues[i].AsJSON(Result, Whitespace, Indent);
   end;
+  if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
+  begin
+    If HasItems then
+    begin
+      Result.AppendLine;
+      dec(Indent, PRETTY_PRINT_SPACING);
+      Result.Append(String.create(' ',Indent));
+    end;
+  end;
+  Result.Append(']');
 end;
 
 procedure TJSONArrayImpl.BeginUpdates;
@@ -5008,16 +4992,16 @@ begin
     TJSONValueType.&array:
     begin
       if Assigned(Self.ArrayValue) then
-         Self.ArrayValue.AsJSON(Result, Whitespace)
+         Self.ArrayValue.AsJSON(Result, Whitespace, Indent)
       else
         Result.Append('null');
     end;
     TJSONValueType.&object:
     begin
       if Assigned(Self.ObjectValue) then
-       Self.ObjectValue.AsJSON(Result, Whitespace, Indent)
-     else
-      Result.Append('null');
+        Self.ObjectValue.AsJSON(Result, Whitespace, Indent)
+      else
+        Result.Append('null');
     end;
 
     TJSONValueType.boolean:
