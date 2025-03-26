@@ -707,7 +707,7 @@ end;
 
 function TStringBuilder.AppendLine: TStringBuilder;
 const
-  LineBreak = $0D000A;
+  LineBreak = $0A000D;
 var
   L: NativeUInt;
 begin
