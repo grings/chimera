@@ -261,7 +261,7 @@ begin
         else if sVal = 'null' then
           FTokenValue.ClearToNull
         else
-          raise EChimeraParseException.Create('Unexpected Value "'+sVal+'"');
+          raise EChimeraParseException.Create('Unexpected Value "'+sVal+'" at Index '+FIndex.toString);
       end;
     end;
   end else
