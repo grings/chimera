@@ -5,6 +5,7 @@ interface
 uses
   Winapi.Windows,
   Winapi.Messages,
+  Winapi.ShellAPI,
   System.SysUtils,
   System.Variants,
   System.Classes,
@@ -37,6 +38,7 @@ type
     FFiles : TDictionary<string, IJSONObject>;
 
     procedure OpenFile(const Filename : string);
+    procedure OnURLClick(Sender: TObject; const URL: string);
   public
     { Public declarations }
   end;
@@ -68,11 +70,17 @@ end;
 procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   FFiles := TDictionary<string, IJSONObject>.Create;
+  Viewer.OnOpenURL := OnURLClick;
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
   FFiles.Free;
+end;
+
+procedure TfrmMain.OnURLClick(Sender: TObject; const URL: string);
+begin
+  ShellExecute(0, 'open', PChar(URL), nil, nil, SW_SHOWNORMAL);
 end;
 
 procedure TfrmMain.OpenFile(const Filename: string);

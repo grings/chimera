@@ -22,7 +22,7 @@ uses
   chimera.json.fmx.viewer;
 
 type
-  TForm1 = class(TForm)
+  TfrmMain = class(TForm)
     loTop: TLayout;
     btnOpen: TButton;
     tsFiles: TTabControl;
@@ -34,6 +34,7 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure tsFilesChange(Sender: TObject);
     procedure chkSortedChange(Sender: TObject);
+    procedure ViewerOpenURL(Sender: TObject; const URL: string);
   private
     FFiles : TDictionary<string, IJSONObject>;
     procedure OpenFile(const Filename : string);
@@ -42,16 +43,63 @@ type
   end;
 
 var
-  Form1: TForm1;
+  frmMain: TfrmMain;
 
 implementation
 
 uses
-  System.IOUtils;
+  System.IOUtils,
+  {$IF Defined(IOS)}
+  macapi.helpers, iOSapi.Foundation, FMX.helpers.iOS
+  {$ELSEIF Defined(ANDROID)}
+  Androidapi.JNI.GraphicsContentViewText,
+  Androidapi.JNI.Net,
+  Androidapi.JNI.App,
+  Androidapi.helpers
+  {$ELSEIF Defined(MACOS)}
+  Posix.Stdlib
+  {$ELSEIF Defined(MSWINDOWS)}
+  Winapi.ShellAPI, Winapi.Windows
+  {$ENDIF}
+  ;
+
+type
+  TUrlOpen = class
+    class procedure Open(URL: string);
+  end;
+
 
 {$R *.fmx}
 
-procedure TForm1.btnOpenClick(Sender: TObject);
+
+
+{ TUrlOpen }
+
+class procedure TUrlOpen.Open(URL: string);
+{$IF Defined(ANDROID)}
+var
+  Intent: JIntent;
+{$ENDIF}
+begin
+{$IF Defined(ANDROID)}
+  Intent := TJIntent.Create;
+  Intent.setAction(TJIntent.JavaClass.ACTION_VIEW);
+  Intent.setData(StrToJURI(URL));
+  tandroidhelper.Activity.startActivity(Intent);
+  // SharedActivity.startActivity(Intent);
+{$ELSEIF Defined(MSWINDOWS)}
+  ShellExecute(0, 'OPEN', PWideChar(URL), nil, nil, SW_SHOWNORMAL);
+{$ELSEIF Defined(IOS)}
+  SharedApplication.OpenURL(StrToNSUrl(URL));
+{$ELSEIF Defined(MACOS)}
+  _system(PAnsiChar('open ' + AnsiString(URL)));
+{$ENDIF}
+end;
+
+
+{ TfrmMain }
+
+procedure TfrmMain.btnOpenClick(Sender: TObject);
 begin
   if dlgOpen.execute then
   begin
@@ -60,22 +108,22 @@ begin
   end;
 end;
 
-procedure TForm1.chkSortedChange(Sender: TObject);
+procedure TfrmMain.chkSortedChange(Sender: TObject);
 begin
   Viewer.Sorted := chkSorted.IsChecked;
 end;
 
-procedure TForm1.FormCreate(Sender: TObject);
+procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   FFiles := TDictionary<string, IJSONObject>.Create;
 end;
 
-procedure TForm1.FormDestroy(Sender: TObject);
+procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
   FFiles.Free;
 end;
 
-procedure TForm1.OpenFile(const Filename: string);
+procedure TfrmMain.OpenFile(const Filename: string);
 begin
   if FFiles.ContainsKey(Filename) then
   begin
@@ -101,7 +149,7 @@ begin
   end;
 end;
 
-procedure TForm1.tsFilesChange(Sender: TObject);
+procedure TfrmMain.tsFilesChange(Sender: TObject);
 begin
   if FFiles.ContainsKey(tsFiles.ActiveTab.text) then
   begin
@@ -111,6 +159,12 @@ begin
     Viewer.JSON := FFiles[sFilename];
     Caption :=  'JSON Viewer - '+ExtractFilename(tsFiles.ActiveTab.text);
   end;
+end;
+
+
+procedure TfrmMain.ViewerOpenURL(Sender: TObject; const URL: string);
+begin
+  TUrlOpen.Open(URL);
 end;
 
 end.

@@ -1,4 +1,4 @@
-unit chimera.json.vcl.viewer;
+﻿unit chimera.json.vcl.viewer;
 
 interface
 
@@ -11,12 +11,19 @@ type
   TJSONTokenType = (jttBrace, jttKey, jttString, jttNumber, jttKeyword, jttWhitespace);
   TJSONBraceType = (brNone, brOpenObject, brCloseObject, brOpenArray, brCloseArray);
 
+  /// <summary>
+  /// Event triggered when a URL within the viewer is clicked
+  /// </summary>
+  TURLClickEvent = procedure(Sender: TObject; const URL: string) of object;
+
   PJSONToken = ^TJSONToken;
   TJSONToken = record
     TokenType: TJSONTokenType;
     Value: string;
     LineIndex: Integer;
     ColumnIndex: Integer;
+    IsURL: Boolean;
+    IsColor: Boolean;
   end;
 
   TJSONLine = class
@@ -31,7 +38,7 @@ type
   public
     constructor Create(const AText: string);
     destructor Destroy; override;
-    procedure AddToken(TokenType: TJSONTokenType; const Value: string; ColIndex: Integer);
+    function AddToken(TokenType: TJSONTokenType; const Value: string; ColIndex: Integer): PJSONToken;
     property Text: string read FText;
     property Tokens: TList read FTokens;
     property Level: Integer read FLevel write FLevel;
@@ -68,6 +75,9 @@ type
     FMaxLineWidth: Integer;
     FHScrollPos: Integer;
     FSorted: Boolean;
+    FOnOpenURL: TURLClickEvent;
+    FActiveURLToken: PJSONToken;
+    FActiveURLLine: Integer;
     
     procedure SetJSON(const Value: IJSONObject);
     procedure SetSource(const Value: TStrings);
@@ -90,12 +100,19 @@ type
     procedure UpdateScrollBars;
     procedure WMVScroll(var Message: TWMVScroll); message WM_VSCROLL;
     procedure WMHScroll(var Message: TWMHScroll); message WM_HSCROLL;
+    function IsURL(const S: string): Boolean;
+    function GetURLFromString(const S: string): string;
+    function IsColorHex(const S: string): Boolean;
+    function HexToColor(const HexColor: string): TColor;
+    function FindTokenAtPosition(X, Y: Integer; out LineIndex: Integer; out Token: PJSONToken): Boolean;
 
-    procedure SetSorted(const Value: Boolean);  protected
+    procedure SetSorted(const Value: Boolean);  
+  protected
     procedure Paint; override;
     procedure Resize; override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure CreateWnd; override;
     procedure CreateParams(var Params: TCreateParams); override;
   public
@@ -165,6 +182,11 @@ type
     /// Properties should be sorted or in natural unspecified order
     /// </summary>
     property Sorted: Boolean read FSorted write SetSorted default False;
+    
+    /// <summary>
+    /// Event triggered when a URL is clicked in the JSON
+    /// </summary>
+    property OnOpenURL: TURLClickEvent read FOnOpenURL write FOnOpenURL;
 
         // Standard control properties
     property Align;
@@ -227,7 +249,7 @@ begin
   inherited;
 end;
 
-procedure TJSONLine.AddToken(TokenType: TJSONTokenType; const Value: string; ColIndex: Integer);
+function TJSONLine.AddToken(TokenType: TJSONTokenType; const Value: string; ColIndex: Integer): PJSONToken;
 var
   Token: PJSONToken;
 begin
@@ -235,7 +257,11 @@ begin
   Token^.TokenType := TokenType;
   Token^.Value := Value;
   Token^.ColumnIndex := ColIndex;
+  Token^.LineIndex := -1;
+  Token^.IsURL := False;
+  Token^.IsColor := False;
   FTokens.Add(Token);
+  Result := Token;
 end;
 
 { TJSONViewer }
@@ -277,6 +303,10 @@ begin
   Font.Name := FFontName;
   Font.Size := FFontSize;
   FGutterWidth := 20;
+  
+  // Initialize URL tracking variables
+  FActiveURLToken := nil;
+  FActiveURLLine := -1;
   
   // Make sure we get input focus
   TabStop := True;
@@ -480,6 +510,7 @@ var
   inString, inKey: Boolean;
   tokenType: TJSONTokenType;
   token: string;
+  jsonToken: PJSONToken;
 begin
   // Tokenize each line
   for i := 0 to FLines.Count - 1 do
@@ -512,7 +543,14 @@ begin
         if inKey then
           line.AddToken(jttKey, token, tokenStart)
         else
-          line.AddToken(jttString, token, tokenStart);
+        begin
+          jsonToken := line.AddToken(jttString, token, tokenStart);
+          
+          // Check if this string is a URL or color
+          jsonToken^.IsURL := IsURL(token);
+          jsonToken^.IsColor := IsColorHex(token);
+          jsonToken^.LineIndex := i;
+        end;
         
         inString := False;
         inKey := False;
@@ -526,22 +564,20 @@ begin
         inKey := False;
         for j := currentPos + 1 to Length(lineText) do
         begin
-          if j <= Length(lineText) then
+          if lineText[j] = ':' then
           begin
-            if lineText[j] = ':' then
-            begin
-              inKey := True;
-              break;
-            end
-            else if not (lineText[j] in [' ', #9, #10, #13, '"']) then
-              break;
-          end;
+            inKey := True;
+            break;
+          end
+          else if not (lineText[j] in [' ', #9, #10, #13, '"']) then
+            break;
         end;
       end
       // Handle structural elements (braces, brackets, commas, colons)
       else if c in ['{', '}', '[', ']', ',', ':'] then
       begin
-        line.AddToken(jttBrace, c, currentPos);
+        jsonToken := line.AddToken(jttBrace, c, currentPos);
+        jsonToken^.LineIndex := i;
         Inc(currentPos);
         continue;
       end
@@ -553,7 +589,8 @@ begin
           Inc(currentPos);
         
         token := Copy(lineText, tokenStart, currentPos - tokenStart);
-        line.AddToken(jttWhitespace, token, tokenStart);
+        jsonToken := line.AddToken(jttWhitespace, token, tokenStart);
+        jsonToken^.LineIndex := i;
         continue;
       end
       // Handle numbers
@@ -565,7 +602,8 @@ begin
           Inc(currentPos);
         
         token := Copy(lineText, tokenStart, currentPos - tokenStart);
-        line.AddToken(jttNumber, token, tokenStart);
+        jsonToken := line.AddToken(jttNumber, token, tokenStart);
+        jsonToken^.LineIndex := i;
         continue;
       end
       // Handle keywords (true, false, null)
@@ -576,21 +614,24 @@ begin
         if (currentPos + 3 <= Length(lineText)) and 
            (Copy(lineText, currentPos, 4) = 'true') then
         begin
-          line.AddToken(jttKeyword, 'true', tokenStart);
+          jsonToken := line.AddToken(jttKeyword, 'true', tokenStart);
+          jsonToken^.LineIndex := i;
           Inc(currentPos, 4);
           continue;
         end
         else if (currentPos + 4 <= Length(lineText)) and 
                 (Copy(lineText, currentPos, 5) = 'false') then
         begin
-          line.AddToken(jttKeyword, 'false', tokenStart);
+          jsonToken := line.AddToken(jttKeyword, 'false', tokenStart);
+          jsonToken^.LineIndex := i;
           Inc(currentPos, 5);
           continue;
         end
         else if (currentPos + 3 <= Length(lineText)) and 
                 (Copy(lineText, currentPos, 4) = 'null') then
         begin
-          line.AddToken(jttKeyword, 'null', tokenStart);
+          jsonToken := line.AddToken(jttKeyword, 'null', tokenStart);
+          jsonToken^.LineIndex := i;
           Inc(currentPos, 4);
           continue;
         end;
@@ -609,13 +650,18 @@ var
   actualLineIndex: Integer;
   line: TJSONLine;
   token: PJSONToken;
-  textRect, gutterRect, ellipsisRect: TRect;
+  textRect, gutterRect, ellipsisRect, colorRect: TRect;
   isExpandable: Boolean;
   matchingLineIndex: Integer;
   matchingLine: TJSONLine;
   closeBraceStr: string;
   originalX: Integer;
   propertyNameDisplayed: Boolean;
+  cleanValue: string;
+  colorValue: TColor;
+  colorBoxWidth: Integer;
+  hasNextToken: Boolean;
+  nextTokenWidth: Integer;
 begin
   // First clear the entire background with the same color
   Canvas.Brush.Color := Color;
@@ -715,6 +761,8 @@ begin
               // Set font style based on token type
               if token^.TokenType in [jttKey, jttKeyword] then
                 Canvas.Font.Style := [fsBold]
+              else if (token^.TokenType = jttString) and token^.IsURL then
+                Canvas.Font.Style := [fsUnderline]
               else
                 Canvas.Font.Style := [];
               
@@ -740,7 +788,7 @@ begin
             Canvas.Brush.Style := bsClear;
             ellipsisRect := Rect(x + 4, y + 2, x + 24, y + FLineHeight - 2);
             Canvas.Rectangle(ellipsisRect);
-            Canvas.TextOut(x + 10, y, '�');
+            Canvas.TextOut(x + 10, y, '…');
             Canvas.Brush.Style := bsSolid;
             x := ellipsisRect.Right + 4;
             
@@ -773,11 +821,41 @@ begin
             // Set font style based on token type
             if token^.TokenType in [jttKey, jttKeyword] then
               Canvas.Font.Style := [fsBold]
+            else if (token^.TokenType = jttString) and token^.IsURL then
+              Canvas.Font.Style := [fsUnderline]
             else
               Canvas.Font.Style := [];
             
             // Draw the token
             Canvas.TextOut(x, y, token^.Value);
+            
+            // If this is a color token, draw a colored rectangle after it
+            if token^.IsColor then
+            begin
+              colorValue := HexToColor(token^.Value);
+              Canvas.Brush.Color := colorValue;
+              Canvas.Pen.Color := clBlack;
+              
+              // Set the color box width
+              colorBoxWidth := FLineHeight - 4;
+              
+              // Calculate space available after this token
+              hasNextToken := (j < line.Tokens.Count - 1);
+              nextTokenWidth := 0;
+              
+              // Check if we have enough space for the color box
+              // If next token is a comma or another punctuation, make sure we don't overlap
+              colorRect := Rect(
+                x + Canvas.TextWidth(token^.Value) + 12,
+                y + 2,
+                x + Canvas.TextWidth(token^.Value) + 12 + colorBoxWidth,
+                y + FLineHeight - 2
+              );
+              
+              Canvas.Rectangle(colorRect);
+              Canvas.Brush.Color := Color; // Reset brush color
+            end;
+            
             x := x + Canvas.TextWidth(token^.Value);
           end;
         end;
@@ -975,6 +1053,14 @@ begin
   
   isEllipsisClick := False;
   isBraceClick := False;
+  
+  // Check if a URL is being clicked
+  if (Button = mbLeft) and (FActiveURLToken <> nil) and (FActiveURLLine >= 0) then
+  begin
+    if Assigned(FOnOpenURL) then
+      FOnOpenURL(Self, GetURLFromString(FActiveURLToken^.Value));
+    Exit;
+  end;
   
   // Determine which line was clicked
   lineIndex := Y div FLineHeight;
@@ -1354,6 +1440,184 @@ begin
   
   // Add some padding
   FMaxLineWidth := FMaxLineWidth + 10;
+end;
+
+function TJSONViewer.IsURL(const S: string): Boolean;
+var
+  cleanS: string;
+begin
+  // Clean the string from quotes if it's a JSON string
+  cleanS := S;
+  if (Length(cleanS) > 2) and (cleanS[1] = '"') and (cleanS[Length(cleanS)] = '"') then
+    cleanS := Copy(cleanS, 2, Length(cleanS) - 2);
+    
+  // Basic URL validation - check if starts with common protocols
+  Result := (Pos('http://', LowerCase(cleanS)) = 1) or 
+            (Pos('https://', LowerCase(cleanS)) = 1) or
+            (Pos('ftp://', LowerCase(cleanS)) = 1) or
+            (Pos('file://', LowerCase(cleanS)) = 1) or
+            (Pos('www.', LowerCase(cleanS)) = 1);
+end;
+
+function TJSONViewer.GetURLFromString(const S: string): string;
+begin
+  Result := S;
+  if (Length(Result) > 2) and (Result[1] = '"') and (Result[Length(Result)] = '"') then
+    Result := Copy(Result, 2, Length(Result) - 2);
+end;
+
+function TJSONViewer.IsColorHex(const S: string): Boolean;
+var
+  cleanS: string;
+  i: Integer;
+  validHexChar: TSysCharSet;
+begin
+  // Clean the string from quotes if it's a JSON string
+  cleanS := S;
+  if (Length(cleanS) > 2) and (cleanS[1] = '"') and (cleanS[Length(cleanS)] = '"') then
+    cleanS := Copy(cleanS, 2, Length(cleanS) - 2);
+    
+  // Check if it starts with # and has proper length (7 for #RRGGBB or 9 for #AARRGGBB)
+  Result := (Length(cleanS) = 7) or (Length(cleanS) = 9);
+  
+  if Result and (cleanS[1] = '#') then
+  begin
+    validHexChar := ['0'..'9', 'A'..'F', 'a'..'f'];
+    
+    for i := 2 to Length(cleanS) do
+      if not CharInSet(cleanS[i], validHexChar) then
+      begin
+        Result := False;
+        Break;
+      end;
+  end
+  else
+    Result := False;
+end;
+
+function TJSONViewer.HexToColor(const HexColor: string): TColor;
+var
+  cleanHex: string;
+
+  function HexValue(const Hex: string): Byte;
+  var
+    i: Integer;
+  begin
+    Result := 0;
+    for i := 1 to Length(Hex) do
+    begin
+      Result := Result * 16;
+      case Hex[i] of
+        '0'..'9': Inc(Result, Ord(Hex[i]) - Ord('0'));
+        'a'..'f': Inc(Result, Ord(Hex[i]) - Ord('a') + 10);
+        'A'..'F': Inc(Result, Ord(Hex[i]) - Ord('A') + 10);
+      end;
+    end;
+  end;
+
+begin
+  // Remove quotes and # character
+  cleanHex := HexColor;
+  if (Length(cleanHex) > 2) and (cleanHex[1] = '"') and (cleanHex[Length(cleanHex)] = '"') then
+    cleanHex := Copy(cleanHex, 2, Length(cleanHex) - 2);
+    
+  if cleanHex[1] = '#' then
+    Delete(cleanHex, 1, 1);
+    
+  if Length(cleanHex) = 6 then  // #RRGGBB format
+    Result := RGB(
+      HexValue(Copy(cleanHex, 1, 2)),
+      HexValue(Copy(cleanHex, 3, 2)),
+      HexValue(Copy(cleanHex, 5, 2))
+    )
+  else if Length(cleanHex) = 8 then  // #AARRGGBB format
+    Result := RGB(
+      HexValue(Copy(cleanHex, 3, 2)),
+      HexValue(Copy(cleanHex, 5, 2)),
+      HexValue(Copy(cleanHex, 7, 2))
+    )
+  else
+    Result := clBlack;  // Default
+end;
+
+function TJSONViewer.FindTokenAtPosition(X, Y: Integer; out LineIndex: Integer; out Token: PJSONToken): Boolean;
+var
+  i, j, lineY, tokenX, currentX: Integer;
+  actualLineIndex: Integer;
+  line: TJSONLine;
+begin
+  Result := False;
+  Token := nil;
+  LineIndex := -1;
+  
+  // Determine which line was clicked
+  i := Y div FLineHeight;
+  
+  // Convert to real line index
+  if (i >= 0) and (i < FVisibleLineIndices.Count - FFirstLine) then
+  begin
+    actualLineIndex := FVisibleLineIndices[i + FFirstLine];
+    LineIndex := actualLineIndex;
+    line := TJSONLine(FLines[actualLineIndex]);
+    
+    // Adjust for horizontal scrolling
+    X := X + FHScrollPos;
+    
+    // Check if the click is in the text area (not in the gutter)
+    if X >= FGutterWidth then
+    begin
+      currentX := FGutterWidth + 4; // Starting position with padding
+      Canvas.Font.Name := FFontName;
+      Canvas.Font.Size := FFontSize;
+      
+      // Iterate through tokens to find which one was clicked
+      for j := 0 to line.Tokens.Count - 1 do
+      begin
+        Token := PJSONToken(line.Tokens[j]);
+        
+        // Calculate token width for click detection
+        tokenX := currentX;
+        currentX := currentX + Canvas.TextWidth(Token^.Value);
+        
+        // Check if click was within this token's bounds
+        if (X >= tokenX) and (X <= currentX) then
+        begin
+          Result := True;
+          Break;
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure TJSONViewer.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  lineIndex: Integer;
+  token: PJSONToken;
+  cursorChanged: Boolean;
+begin
+  inherited;
+  
+  cursorChanged := False;
+  
+  // Reset cursor if we're not over a URL
+  if FindTokenAtPosition(X, Y, lineIndex, token) then
+  begin
+    if (token <> nil) and (token^.TokenType = jttString) and token^.IsURL then
+    begin
+      Screen.Cursor := crHandPoint;
+      FActiveURLToken := token;
+      FActiveURLLine := lineIndex;
+      cursorChanged := True;
+    end;
+  end;
+  
+  if not cursorChanged then
+  begin
+    Screen.Cursor := crDefault;
+    FActiveURLToken := nil;
+    FActiveURLLine := -1;
+  end;
 end;
 
 end.
