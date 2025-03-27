@@ -1,0 +1,68 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'Form1'
+  ClientHeight = 480
+  ClientWidth = 640
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  DesignerMasterStyle = 0
+  object loTop: TLayout
+    Align = Top
+    Size.Width = 640.000000000000000000
+    Size.Height = 41.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object btnOpen: TButton
+      Position.X = 8.000000000000000000
+      Position.Y = 11.000000000000000000
+      TabOrder = 0
+      Text = 'Open'
+      TextSettings.Trimming = None
+      OnClick = btnOpenClick
+    end
+    object chkSorted: TCheckBox
+      Position.X = 96.000000000000000000
+      Position.Y = 14.000000000000000000
+      TabOrder = 1
+      Text = 'Sorted'
+      OnChange = chkSortedChange
+    end
+  end
+  object tsFiles: TTabControl
+    Align = Bottom
+    Position.Y = 448.000000000000000000
+    Size.Width = 640.000000000000000000
+    Size.Height = 32.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    TabPosition = Bottom
+    OnChange = tsFilesChange
+  end
+  object dlgOpen: TOpenDialog
+    DefaultExt = '.json'
+    Filter = 'JSON File (*.json)|*.json|All Files (*.*)|*.*'
+    FilterIndex = 0
+    Options = [ofHideReadOnly, ofAllowMultiSelect, ofPathMustExist, ofFileMustExist, ofEnableSizing]
+    Title = 'Select a JSON File'
+    Left = 304
+    Top = 224
+  end
+  object Viewer: TJSONViewer
+    FontFamily = 'Courier New'
+    FontSize = 12.000000000000000000
+    BraceColor = claNavy
+    KeyColor = claBlack
+    StringColor = claGreen
+    NumberColor = claMaroon
+    KeywordColor = claBlue
+    Align = Client
+    Size.Width = 640.000000000000000000
+    Size.Height = 407.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 5
+  end
+end

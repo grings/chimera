@@ -11,3 +11,7 @@ json/__history/
 utility/__history/
 json/backup
 common/__history
+__history
+*.delphilsp.json
+std*.txt
+*.bak
