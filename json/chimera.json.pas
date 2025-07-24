@@ -569,6 +569,7 @@ type
     class function From(RTLArray : System.JSON.TJSONArray) : IJSONArray; overload;
     {$ENDIF}
     class function From(MVA : TMultiValues) : IJSONArray; overload;
+    class function FromFile(const Filename : string) : IJSONArray;
   end;
 
 function JSON(const src : string = '') : IJSONObject; deprecated 'Use TJSON.From or TJSON.New instead';
@@ -2871,6 +2872,19 @@ begin
       Result.Add(v.AsBoolean)
     else
       raise EInvalidJSONType.Create('Cannot determine value type for storage in JSON Array.');
+  end;
+end;
+
+class function TJSONArray.FromFile(const Filename: string): IJSONArray;
+var
+  fs : TStringStream;
+begin
+  fs := TStringStream.Create;
+  try
+    fs.LoadFromFile(Filename);
+    Result := TJSONArray.From(fs.DataString);
+  finally
+    fs.Free;
   end;
 end;
 
