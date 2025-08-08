@@ -3524,7 +3524,8 @@ var
   item : TPair<string, PMultiValue>;
 begin
   for item in FValues do
-    proc(item.Key, item.Value.IntegerValue);
+    if (item.value.ValueType = TJSONValueType.number) and (item.Value.IntegerValue = item.value.NumberValue) then
+      proc(item.Key, item.Value.IntegerValue);
 end;
 
 procedure TJSONObject.Each(proc: TProcConst<string, boolean>);
@@ -3532,7 +3533,8 @@ var
   item : TPair<string, PMultiValue>;
 begin
   for item in FValues do
-    proc(item.Key, item.Value.IntegerValue <> 0);
+    if (item.value.ValueType = TJSONValueType.boolean) then
+      proc(item.Key, item.Value.IntegerValue <> 0);
 end;
 
 procedure TJSONObject.Each(proc: TProcConst<string, string>);
@@ -3540,7 +3542,8 @@ var
   item : TPair<string, PMultiValue>;
 begin
   for item in FValues do
-    proc(item.Key, TJSON.Decode(item.Value.StringValue));
+    if (item.value.ValueType = TJSONValueType.string) then
+      proc(item.Key, TJSON.Decode(item.Value.StringValue));
 end;
 
 procedure TJSONObject.Each(proc: TProcConst<string, double>);
@@ -3548,7 +3551,8 @@ var
   item : TPair<string, PMultiValue>;
 begin
   for item in FValues do
-    proc(item.Key, item.Value.NumberValue);
+    if (item.value.ValueType = TJSONValueType.Number) then
+      proc(item.Key, item.Value.NumberValue);
 end;
 
 procedure TJSONObject.Each(proc: TProcConst<string, Variant>);
@@ -3572,7 +3576,8 @@ var
   item : TPair<string, PMultiValue>;
 begin
   for item in FValues do
-    proc(item.Key, item.Value.ObjectValue);
+    if (item.value.ValueType = TJSONValueType.object) then
+      proc(item.Key, item.Value.ObjectValue);
 end;
 
 procedure TJSONObject.Each(proc: TProcConst<string, IJSONArray>);
@@ -3580,7 +3585,8 @@ var
   item : TPair<string, PMultiValue>;
 begin
   for item in FValues do
-    proc(item.Key, item.Value.ArrayValue);
+    if (item.value.ValueType = TJSONValueType.array) then
+      proc(item.Key, item.Value.ArrayValue);
 end;
 
 procedure TJSONObject.Each(proc: TBreakableProc<string, int64>);
@@ -3591,7 +3597,8 @@ begin
   bContinue := True;
   for item in FValues do
   begin
-    proc(item.Key, item.Value.IntegerValue, bContinue);
+    if (item.value.ValueType = TJSONValueType.string) then
+      proc(item.Key, item.Value.IntegerValue, bContinue);
     if not bContinue then
       Break;
   end;
@@ -3605,7 +3612,8 @@ begin
   bContinue := True;
   for item in FValues do
   begin
-    proc(item.Key, item.Value.IntegerValue <> 0, bContinue);
+    if (item.value.ValueType = TJSONValueType.boolean) then
+      proc(item.Key, item.Value.IntegerValue <> 0, bContinue);
     if not bContinue then
       Break;
   end;
@@ -3619,7 +3627,8 @@ begin
   bContinue := True;
   for item in FValues do
   begin
-    proc(item.Key, TJSON.Decode(item.Value.StringValue), bContinue);
+    if (item.value.ValueType = TJSONValueType.string) then
+      proc(item.Key, TJSON.Decode(item.Value.StringValue), bContinue);
     if not bContinue then
       Break;
   end;
@@ -3633,7 +3642,8 @@ begin
   bContinue := True;
   for item in FValues do
   begin
-    proc(item.Key, item.Value.NumberValue, bContinue);
+    if (item.value.ValueType = TJSONValueType.number) then
+      proc(item.Key, item.Value.NumberValue, bContinue);
     if not bContinue then
       Break;
   end;
@@ -3675,7 +3685,8 @@ begin
   bContinue := True;
   for item in FValues do
   begin
-    proc(item.Key, item.Value.ObjectValue, bContinue);
+    if (item.value.ValueType = TJSONValueType.object) then
+      proc(item.Key, item.Value.ObjectValue, bContinue);
     if not bContinue then
       Break;
   end;
@@ -3689,7 +3700,8 @@ begin
   bContinue := True;
   for item in FValues do
   begin
-    proc(item.Key, item.Value.ArrayValue, bContinue);
+    if (item.value.ValueType = TJSONValueType.array) then
+      proc(item.Key, item.Value.ArrayValue, bContinue);
     if not bContinue then
       Break;
   end;
