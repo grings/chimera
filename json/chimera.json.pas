@@ -38,10 +38,12 @@ interface
 uses
   {$IFDEF FPC}
   SysUtils,
+  Generics.Collections,
   Classes;
   {$ELSE}
   System.SysUtils,
   System.Classes,
+  System.Generics.Collections,
   System.JSON
   {$IFDEF USEFASTCODE}, chimera.FastStringBuilder{$ENDIF};
   {$ENDIF}
@@ -565,6 +567,7 @@ type
     class function New(SetupNewArray : TChangeArrayHandler) : IJSONArray; overload;
     class function From(const src : string = '') : IJSONArray; overload;
     class function From<T>(const ary : TArray<T>) : IJSONArray; overload;
+    class function From<T>(const list : TList<T>) : IJSONArray; overload;
     {$IFNDEF FPC}
     class function From(RTLArray : System.JSON.TJSONArray) : IJSONArray; overload;
     {$ENDIF}
@@ -587,7 +590,6 @@ uses
   {$IFDEF FPC}
   Character,
   Variants,
-  Generics.Collections,
   Generics.Defaults,
   StrUtils,
   DateUtils,
@@ -595,7 +597,6 @@ uses
   {$ELSE}
   System.Character,
   System.Variants,
-  System.Generics.Collections,
   System.Generics.Defaults,
   System.StrUtils,
   System.DateUtils,
@@ -2834,6 +2835,44 @@ begin
       TJSONValueType.code:
         Result.AddCode(mv.StringValue);
     end;
+  end;
+end;
+
+class function TJSONArray.From<T>(const list: TList<T>): IJSONArray;
+var
+  item : T;
+  ti : Pointer;
+  v : TValue;
+begin
+  Result := New;
+  ti := TypeInfo(T);
+  for item in list do
+  begin
+    v := TValue.From<T>(item);
+    if ti = TypeInfo(TGUID) then
+      Result.Add(v.AsType<TGUID>)
+    else if ti = TypeInfo(IJSONArray) then
+      Result.Add(v.AsType<IJSONArray>)
+    else if ti = TypeInfo(IJSONObject) then
+      Result.Add(v.AsType<IJSONObject>)
+    else if ti = TypeInfo(TArray<Byte>) then
+      {$IFDEF FPC}
+      raise Exception.Create('Byte Array not supported on FPC at this time.')
+      {$ELSE}
+      Result.Add(v.AsType<TArray<Byte>>)
+      {$ENDIF}
+    else if ti = TypeInfo(String) then
+      Result.Add(v.AsString)
+    else if ti = TypeInfo(Double) then
+      Result.Add(v.AsExtended)
+    else if ti = TypeInfo(Int64) then
+      Result.add(v.AsInt64)
+    else if ti = TypeInfo(Integer) then
+      Result.Add(v.AsInteger)
+    else if ti = TypeInfo(Boolean) then
+      Result.Add(v.AsBoolean)
+    else
+      raise EInvalidJSONType.Create('Cannot determine value type for storage in JSON Array.');
   end;
 end;
 
