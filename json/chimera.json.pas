@@ -1568,7 +1568,7 @@ var
 begin
   SetLength(Result, FValues.Count);
   for i := 0 to FValues.Count-1 do
-    Result[i] := FValues[i]^.StringValue;
+    Result[i] := TJSON.Decode(FValues[i]^.StringValue);
 end;
 
 procedure TJSONArrayImpl.AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard);
