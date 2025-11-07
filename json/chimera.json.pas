@@ -541,7 +541,7 @@ type
   public
     class constructor Create;
 
-    class function ContentType : string;
+    class function ContentType(SpecifyUTF8 : boolean = false) : string;
 
     class function New : IJSONObject; overload;
     class function New(SetupNewObject : TChangeObjectHandler) : IJSONObject; overload;
@@ -1285,9 +1285,11 @@ begin
   Result := TJSON.Decode(str);
 end;
 
-class function TJSON.ContentType: string;
+class function TJSON.ContentType(SpecifyUTF8 : boolean = false): string;
 begin
   result := 'application/javascript';
+  if SpecifyUTF8 then
+    result := Result+'; charset=utf-8';
 end;
 
 class constructor TJSON.Create;
