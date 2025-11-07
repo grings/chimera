@@ -4160,11 +4160,13 @@ end;
 
 function TJSONObject.LoadFromFile(const Filename: string) : IJSONObject;
 var
-  fs : TFileStream;
+  fs : TStringStream;
 begin
-  fs := TFileStream.Create(Filename, fmOpenRead or fmShareDenyNone);
+  fs := TStringStream.Create;
   try
-    Result := LoadFromStream(fs);
+    fs.LoadFromFile(Filename);
+    Reload(fs.DataString);
+    Result := Self;
   finally
     fs.Free;
   end;
@@ -4231,15 +4233,15 @@ end;
 
 function TJSONObject.LoadFromStream(Stream: TStream) : IJSONObject;
 var
-  ss : TStringStream;
+  Buffer : TArray<Byte>;
+  Size : Int64;
+  Encoding : TEncoding;
 begin
-  ss := TStringStream.Create('', TEncoding.utf8);
-  try
-    ss.CopyFrom(Stream, Stream.Size-Stream.Position);
-    Reload(ss.DataString);
-  finally
-    ss.Free;
-  end;
+  Size := Stream.Size-Stream.Position;
+  SetLength(Buffer, Size);
+  Stream.Read(Buffer, Size);
+  TEncoding.GetBufferEncoding(Buffer, Encoding);
+  Reload(Encoding.GetString(Buffer));
   Result := Self;
 end;
 
