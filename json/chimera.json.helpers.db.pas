@@ -180,6 +180,7 @@ begin
           TFieldType.ftExtended,
           ftCurrency,
           ftFloat,
+          ftFMTBcd,
           ftBCD:
             jso.Numbers[Fields[i].FieldName] := Fields[i].AsExtended;
 
@@ -236,7 +237,6 @@ begin
           ftOraClob,
           ftInterface,
           ftIDispatch,
-          ftFMTBcd,
           ftConnection,
           ftParams,
           ftStream,
