@@ -109,6 +109,7 @@ type
   end;
   TMultiValues = TArray<TMultiValue>;
 
+  TTestPropertyHandler = reference to function(const Prop : string; const Value : PMultiValue) : boolean;
   TMVScanMatchHandler = reference to procedure(const Target : IJSONObject; const prop : string; const Value : PMultiValue);
 
   IJSONArray = interface(IInterface)
@@ -515,7 +516,7 @@ type
     function ValueType : TJSONValueType;
     function AsValue : TMultiValue;
 
-    function Clone : IJSONObject;
+    function Clone(const OnTestProperty : TTestPropertyHandler = nil) : IJSONObject;
 
     function Query(const Path : string) : IJSONArray;
     procedure Update(JQL : string);
@@ -870,7 +871,7 @@ type
     function GetHas(const name: string): boolean;
     //procedure ParentOverride(parent : IJSONArray); overload;
     //procedure ParentOverride(parent : IJSONObject); overload;
-    function Clone : IJSONObject;
+    function Clone(const OnTestProperty : TTestPropertyHandler = nil) : IJSONObject;
     function Compare(const Left, Right: TPair<string, PMultiValue>): Integer;
   private
     FValues : TDictionary<string, PMultiValue>;
@@ -3256,9 +3257,28 @@ begin
   FValues.Clear;
 end;
 
-function TJSONObject.Clone: IJSONObject;
+function TJSONObject.Clone(const OnTestProperty : TTestPropertyHandler = nil): IJSONObject;
 begin
-  Result := TJSON.From(Self.AsJSON);
+  Result := TJSON.New;
+  for var mv in FValues do
+    if (not Assigned(OnTestProperty)) or OnTestProperty(mv.Key, mv.Value) then
+    begin
+      case mv.Value.ValueType of
+        TJSONValueType.&string:
+          Result.Add(mv.Key, mv.Value.StringValue);
+        TJSONValueType.number:
+          Result.Add(mv.Key, mv.Value.NumberValue);
+        TJSONValueType.&array:
+          Result.Add(mv.Key, mv.Value.ArrayValue);
+        TJSONValueType.&object:
+          Result.Add(mv.Key, mv.Value.ObjectValue);
+        TJSONValueType.boolean:
+          Result.Add(mv.Key, mv.Value.IntegerValue <> 0);
+        TJSONValueType.null:
+          Result.AddNull(mv.Key);
+      end;
+      Result.Add(mv.Key, mv.Value)
+    end;
 end;
 
 function TJSONObject.Compare(const Left, Right: TPair<string, PMultiValue>): Integer;
