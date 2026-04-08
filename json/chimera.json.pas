@@ -1643,13 +1643,16 @@ begin
 end;
 
 procedure TJSONArrayImpl.Clear;
+var
+  i: Integer;
 begin
-  while Count > 0 do
+  for i := 0 to FValues.Count - 1 do
   begin
-    if FValues[0].ObjectValue <> nil then
-      FValues[0].ObjectValue.OnChange := nil;
-    Delete(0);
+    if FValues[i].ObjectValue <> nil then
+      FValues[i].ObjectValue.OnChange := nil;
+    Dispose(FValues[i]);
   end;
+  FValues.Clear;
 end;
 
 function TJSONArrayImpl.Clone: IJSONArray;
