@@ -16,6 +16,7 @@ __history
 std*.txt
 *.bak
 .DS_Store
+__recovery
 
 # DPM pack output (local feed)
 dist/dpm/
