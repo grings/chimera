@@ -65,7 +65,8 @@ type
     TParseToken = (&String, Colon, OpenObject, CloseObject, OpenArray, CloseArray, Comma, EOF, MaxOp, Value);
   private
     FFmt : TFormatSettings;
-    FText : string;
+    //FText : string;
+    FPText : PChar;
     FTextLength : integer;
     FIndex : integer;
     FToken : TParseToken;
@@ -84,12 +85,12 @@ type
   public
     constructor Create; virtual;
     destructor Destroy; override;
-    procedure ExecuteTo(const AText : string; const Obj : IJSONObject);
-    function Execute(const AText : string) : IJSONObject;
-    function ExecuteForArray(const AText : string) : IJSONArray;
-    class function Parse(const AText : string) : IJSONObject;
-    class procedure ParseTo(const AText : string; const Obj : IJSONObject);
-    class function ParseArray(const AText : string) : IJSONArray; overload;
+    procedure ExecuteTo(const AText : PChar; const Obj : IJSONObject);
+    function Execute(const AText : PChar) : IJSONObject;
+    function ExecuteForArray(const AText : PChar) : IJSONArray;
+    class function Parse(const AText : PChar) : IJSONObject;
+    class procedure ParseTo(const AText : PChar; const Obj : IJSONObject);
+    class function ParseArray(const AText : PChar) : IJSONArray; overload;
   end;
 
 function CreateENUSFormatSettings : TFormatSettings; inline;
@@ -167,108 +168,94 @@ begin
 end;
 
 function TParser.GetToken: boolean;
-  function IsLetterOrDigit(c : {$IFDEF FPC}{$IFDEF UNICODE}Char{$ELSE}UnicodeChar{$ENDIF}{$ELSE}Char{$ENDIF}; fmt : TFormatSettings) : boolean; inline;
+  function IsValueChar(c : {$IFDEF FPC}{$IFDEF UNICODE}Char{$ELSE}UnicodeChar{$ENDIF}{$ELSE}Char{$ENDIF}; fmt : TFormatSettings) : boolean; inline;
   begin
     Result := (c.IsLetterOrDigit) or (c = '-') or (c = '+') or (c = fmt.DecimalSeparator);
   end;
 var
+  c : Char;
   d : Double;
   b : boolean;
-  i, iCnt : integer;
   iStart : integer;
-  j: Integer;
+  iCnt : integer;
+  iBack : integer;
   sVal : string;
 begin
-  FTmpIdent.Clear;
-  while FIndex <= FTextLength do
+  Result := False;
+  inc(FIndex);
+  while FIndex < FTextLength do
   begin
-    inc(FIndex);
-    if CharInSet(FText.Chars[FIndex], [ '{', '}', '[', ']', ',', '"', ':']) then
-    begin
-      // Is an Operator
-      FTmpIdent.Append(FText.Chars[FIndex]);
-      break;
-    end else if (FText.Chars[FIndex] <= Char($20)) then
-    begin
-      continue;
-    end else if IsLetterOrDigit(FText.Chars[FIndex], FFmt) then
-    begin
-      // Is an identifier or value
-      iStart := FIndex;
-      repeat
-        inc(FIndex);
-      until not IsLetterOrDigit(FText.Chars[FIndex], FFmt);
-
-      FTmpIdent.Append(FText.Substring(iStart,FIndex-iStart));
-
-      dec(FIndex);
-      break;
-    end;
-    // Ignore Everything Else
-  end;
-  if FTmpIdent.Length > 0 then
-  begin
-    case FTmpIdent.Chars[0] of
-      '{': FToken := TParseToken.OpenObject;
-      '}': FToken := TParseToken.CloseObject;
-      '[': FToken := TParseToken.OpenArray;
-      ']': FToken := TParseToken.CloseArray;
-      ',': FToken := TParseToken.Comma;
-      ':': FToken := TParseToken.Colon;
+    c := FPText[FIndex];
+    case c of
+      '{': begin FToken := TParseToken.OpenObject; Exit; end;
+      '}': begin FToken := TParseToken.CloseObject; Exit; end;
+      '[': begin FToken := TParseToken.OpenArray; Exit; end;
+      ']': begin FToken := TParseToken.CloseArray; Exit; end;
+      ',': begin FToken := TParseToken.Comma; Exit; end;
+      ':': begin FToken := TParseToken.Colon; Exit; end;
       '"':
       begin
         FToken := TParseToken.&String;
-        FTmpValue.Clear;
-        for i := FIndex+1 to FTextLength do
+        iStart := FIndex + 1;
+        FIndex := iStart;
+        while FIndex < FTextLength do
         begin
-          if (FText.Chars[i] = '"') then
+          c := FPText[FIndex];
+          if c = '"' then
           begin
-            if (FText.Chars[i-1] <> '\') then
+            if (FIndex > iStart) and (FPText[FIndex - 1] = '\') then
             begin
-              break;
+              iCnt := 0;
+              iBack := FIndex - 1;
+              while (iBack >= iStart) and (FPText[iBack] = '\') do
+              begin
+                inc(iCnt);
+                dec(iBack);
+              end;
+              if Odd(iCnt) then
+              begin
+                inc(FIndex);
+                continue;
+              end;
             end;
-            iCnt := 1;
-            for j := i-2 downto 0 do
-            begin
-              if FText.Chars[j] = '\' then
-                inc(iCnt)
-              else
-                break;
-            end;
-            if (iCnt mod 2) <> 0 then
-            begin
-              FTmpValue.Append('"');
-            end else
-            begin
-              break;
-            end;
-          end else
-          begin
-            FTmpValue.Append(FText.Chars[i]);
+            break;
           end;
+          inc(FIndex);
         end;
-        FIndex := i;
-        FTokenValue.Initialize(FTmpValue.ToString);
+        SetString(sVal, FPText + iStart, FIndex - iStart);
+        FTokenValue.Initialize(sVal);
+        Exit;
       end;
-      else
+      #1..#32:
       begin
+        inc(FIndex);
+        continue;
+      end;
+    else
+      if IsValueChar(c, FFmt) then
+      begin
+        iStart := FIndex;
+        inc(FIndex);
+        while IsValueChar(FPText[FIndex], FFmt) do
+          inc(FIndex);
+        dec(FIndex);
         FToken := TParseToken.Value;
-        sVal := FTmpIdent.ToString;
+        SetString(sVal, FPText + iStart, FIndex - iStart + 1);
         if TryStrToFloat(sVal, d, FFmt) then
           FTokenValue.Initialize(d)
-        else if TryStrToBool(sVal,b) then
+        else if TryStrToBool(sVal, b) then
           FTokenValue.Initialize(b)
         else if sVal = 'null' then
           FTokenValue.ClearToNull
         else
-          raise EChimeraParseException.Create('Unexpected Value "'+sVal+'" at Index '+FIndex.toString);
+          raise EChimeraParseException.Create('Unexpected Value "' + sVal + '" at Index ' + FIndex.toString);
+        Exit;
       end;
+      inc(FIndex);
+      continue;
     end;
-  end else
-  begin
-    FToken := TParseToken.EOF;
   end;
-  Result := False;
+  FToken := TParseToken.EOF;
 end;
 
 function TParser.ParseArray : IJSONArray;
@@ -430,7 +417,7 @@ begin
   end;
 end;
 
-class procedure TParser.ParseTo(const AText: string;
+class procedure TParser.ParseTo(const AText: PChar;
   const Obj: IJSONObject);
 var
   p : TParser;
@@ -443,7 +430,7 @@ begin
   end;
 end;
 
-function TParser.Execute(const AText: string): IJSONObject;
+function TParser.Execute(const AText: PChar): IJSONObject;
   function SimpleJSONValue : IJSONObject;
   begin
     Result := TJSON.New;
@@ -477,8 +464,9 @@ begin
     exit;
   end;
   FIndex := -1;
-  FText := AText;
-  FTextLength := Length(AText);
+  //FText := AText;
+  FTextLength := StrLen(AText);
+  FPText := AText;//PChar(AText);
   if GetToken then
     exit;
   case FToken of
@@ -498,7 +486,7 @@ begin
   end;
 end;
 
-function TParser.ExecuteForArray(const AText : string) : IJSONArray;
+function TParser.ExecuteForArray(const AText : PChar) : IJSONArray;
 begin
   if Trim(AText) = '' then
   begin
@@ -506,14 +494,15 @@ begin
     exit;
   end;
   FIndex := -1;
-  FText := AText;
-  FTextLength := Length(AText);
+  //FText := AText;
+  FTextLength := StrLen(AText);
+  FPText := AText;//PChar(AText);
   if GetToken then
     exit;
   Result := ParseArray;
 end;
 
-procedure TParser.ExecuteTo(const AText: string; const Obj: IJSONObject);
+procedure TParser.ExecuteTo(const AText: PChar; const Obj: IJSONObject);
 begin
   if Trim(AText) = '' then
   begin
@@ -521,14 +510,15 @@ begin
     exit;
   end;
   FIndex := -1;
-  FText := AText;
-  FTextLength := Length(AText);
+  //FText := AText;
+  FTextLength := StrLen(AText);
+  FPText := AText;//PChar(AText);
   if GetToken then
     exit;
   ParseObjectTo(Obj);
 end;
 
-class function TParser.Parse(const AText: string): IJSONObject;
+class function TParser.Parse(const AText: PChar): IJSONObject;
 var
   p : TParser;
 begin
@@ -540,7 +530,7 @@ begin
   end;
 end;
 
-class function TParser.ParseArray(const AText : string) : IJSONArray;
+class function TParser.ParseArray(const AText : PChar) : IJSONArray;
 var
   p : TParser;
 begin

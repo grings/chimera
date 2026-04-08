@@ -1385,7 +1385,7 @@ end;}
 class function TJSON.From(const src : string) : IJSONObject;
 begin
   if src <> '' then
-    Result := TParser.Parse(src)
+    Result := TParser.Parse(PChar(src))
   else
     Result := TJSONObject.Create;
 end;
@@ -2819,7 +2819,7 @@ end;
 class function TJSONArray.From(const src: string): IJSONArray;
 begin
   if src <> '' then
-    Result := TParser.ParseArray(src)
+    Result := TParser.ParseArray(PChar(src))
   else
     Result := TJSONArrayImpl.Create;
 end;
@@ -4391,7 +4391,7 @@ end;
 procedure TJSONObject.Reload(const Source: string);
 begin
   Clear;
-  TParser.ParseTo(Source, Self);
+  TParser.ParseTo(PChar(Source), Self);
   DoChangeNotify;
 end;
 
