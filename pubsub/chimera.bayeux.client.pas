@@ -137,7 +137,8 @@ type
     FHandshakeSuccessCount:Int64;
 
 
-    procedure DoLogVerbose(const Msg: string);
+    procedure DoLogVerbose(const Msg: string); virtual;
+    procedure DoLogError(const Msg: string); virtual;
 
 
 
@@ -226,9 +227,9 @@ begin
   if not FDeferConnect then
     StartListener;
 
-  {$ifdef BAYEUX_VERBOSE_TRACE}
-  DoLogVerbose('TBayeuxClient.Create');
-  {$endif}
+
+  DoLogVerbose('TBayeuxClient.Create '+Copy(Endpoint,1,14));
+
 
 
   ResubPingerThread := TThread.CreateAnonymousThread(
@@ -279,15 +280,17 @@ begin
           end else
           begin
              Inc(DoNothing);
-             if (DoNothing mod 1000 = 1) then
-                  DoLogVerbose('Bayeux Client ID Shifting logic is NOT enabled');
+
+
+//             if (DoNothing mod 1000 = 1) then
+//                  DoLogVerbose('Bayeux Client ID Shifting logic is NOT enabled');
 
           end;
         except
           on e: exception
           do
           begin
-            DoLogVerbose('Ping Thread Error: '+e.ClassName+' "'+e.Message+'"');
+            DoLogError('Ping Thread Error: '+e.ClassName+' "'+e.Message+'"');
           end;
         end;
         sleep(500);
@@ -339,10 +342,8 @@ end;
 
 function TBayeuxClient.DoAuthenticate(var Username, Password: string): boolean;
 begin
+  DoLogVerbose('Bayeux Auth Starting '+Copy(Username,1,3)+' haspwd:'+ BoolToStr(Length(Password)<>0,true)  );
 
-{$ifdef BAYEUX_VERBOSE_TRACE}
-  DoLogVerbose('TBayeuxClient.DoAuthenticate '+Username);
-  {$endif}
 
   Result := Assigned(FOnAuthenticate);
   if Result then
@@ -356,6 +357,11 @@ begin
 end;
 
 
+
+procedure TBayeuxClient.DoLogError(const Msg: string);
+begin
+  // subclasses care about this.
+end;
 
 procedure TBayeuxClient.DoLogVerbose(const Msg : string);
 begin
@@ -426,13 +432,18 @@ function TBayeuxClient.DoSendMessage(http: THTTPClient; const Msg: IJSONObject) 
         ssResponse := TStringStream.Create('',TEncoding.UTF8);
         try
           try
+
             rescode := http.post(FEndpoint.ToString, ssSource, ssResponse);
+
+            DoLogVerbose('POST :: '+FEndPoint.ToString+' '+IntToStr(rescode.StatusCode)+' response~'+IntToStr(ssResponse.Size)+ ' : '+rescode.StatusText);
+
+
             if rescode.StatusCode <> 200 then
               raise ENetHTTPRequestException.Create(rescode.StatusCode.ToString+': '+rescode.StatusText+' @ '+FEndpoint.ToString + #13#10+Msg.AsJSON(TWhitespace.Pretty));
           except
             on e: exception do
             begin
-              DoLogVerbose('HTTP Error "'+e.Message+'" waiting for Retry.');
+              DoLogError('HTTP Error "'+e.Message+'" waiting for Retry.');
               FreeAndNil(ssSource);
               FreeAndNil(ssResponse);
               try
@@ -476,7 +487,7 @@ function TBayeuxClient.DoSendMessage(http: THTTPClient; const Msg: IJSONObject) 
       except
         on e: exception do
         begin
-          DoLogVerbose('DoSend EX '+E.ClassName+' '+E.Message);
+          DoLogError( 'DoSend EX '+E.ClassName+' '+E.Message);
           jsoError := JSON();
           jsoError.Booleans['successful'] := false;
           jsoError.Strings['error'] := 'Local Send Message Error: '+e.Message;
@@ -772,6 +783,7 @@ begin
     begin
       http := THTTPClient.Create;
       try
+      try
         SetupHTTP(http);
 
 
@@ -813,6 +825,17 @@ begin
 
       finally
         http.Free;
+      end;
+      except
+        on E:Exception do
+        begin
+          if Assigned(OnError) then
+          begin
+            OnError('_fault/', E.Message);
+          end;
+
+        end;
+
       end;
     end
   ).Start;
@@ -1079,7 +1102,7 @@ begin
       except
         on E: Exception do
         begin
-          FOwner.DoLogVerbose('Main connection loop error "'+E.Message+'"');
+          FOwner.DoLogError(' [bayeux] connection loop error "'+E.Message+'"');
           if not WaitInterval then
             break
         end;
