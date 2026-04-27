@@ -342,7 +342,7 @@ end;
 
 function TBayeuxClient.DoAuthenticate(var Username, Password: string): boolean;
 begin
-  DoLogVerbose('Bayeux Aux Starting '+Copy(Username,1,3));
+  DoLogVerbose('Bayeux Auth Starting '+Copy(Username,1,3)+' haspwd:'+ BoolToStr(Length(Password)<>0,true)  );
 
 
   Result := Assigned(FOnAuthenticate);
