@@ -1,0 +1,72 @@
+min dpm client version: 1.0
+
+metadata:
+  id: sivv.chimera
+  version: 1.0.0
+  description: Fast JSON, JWT/JWK, pub/sub, and storage utilities for Delphi.
+  authors:
+    - Sivv LLC
+    - Jason Southwell
+  projectUrl: https://bitbucket.org/sivv/chimera
+  repositoryUrl: https://bitbucket.org/sivv/chimera
+  repositoryBranch: master
+  repositoryCommit: "#HASH#"
+  license: MIT
+  copyright: Copyright (c) 2012 Sivv LLC; Copyright (c) 2022 Jason Southwell
+  readme: README.md
+  tags:
+    - json
+    - jwt
+    - jwk
+    - pubsub
+    - storage
+
+# Platforms differ by Delphi version; each entry lists only what DPM accepts for that compiler.
+targetPlatforms:
+  - compiler: 10.0
+    platforms: [Win32, Win64, MacOS32, Android, iOS32, iOS64, iOSSimulator]
+    template: default
+  - compiler: 10.1
+    platforms: [Win32, Win64, MacOS32, Android, iOS32, iOS64, iOSSimulator]
+    template: default
+  - compiler: 10.2
+    platforms: [Win32, Win64, MacOS32, Android, iOS32, iOS64, iOSSimulator, Linux64]
+    template: default
+  - compiler: 10.3
+    platforms: [Win32, Win64, MacOS32, MacOS64, Android, Android64, iOS32, iOS64, iOSSimulator, Linux64]
+    template: default
+  - compiler: 10.4
+    platforms: [Win32, Win64, MacOS64, Android, Android64, iOS64, iOSSimulator, Linux64]
+    template: default
+  - compiler from: 11.0
+    compiler to: 12.0
+    platforms: [Win32, Win64, MacOS64, MacOSARM64, Android, Android64, iOS64, Linux64]
+    template: default
+  - compiler: 13.0
+    platforms: [Win32, Win64, WinARM64EC, MacOS64, MacOSARM64, Android, Android64, iOS64, Linux64]
+    template: default
+
+templates:
+  - name: default
+    source:
+      - src: ./json/chimera*.pas
+        dest: src/json
+      - src: ./json/chimera.inc
+        dest: src/json
+      - src: ./pubsub/chimera*.pas
+        dest: src/pubsub
+      - src: ./storage/chimera*.pas
+        dest: src/storage
+      - src: ./utility/chimera*.pas
+        dest: src/utility
+      - src: ./utility/chimera*.inc
+        dest: src/utility
+      - src: ./common/chimera*.pas
+        dest: src/common
+      - src: ./LICENSE
+    searchPaths:
+      - path: src/json
+      - path: src/pubsub
+      - path: src/storage
+      - path: src/utility
+      - path: src/common

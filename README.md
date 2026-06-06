@@ -4,6 +4,134 @@
 
 Chimera is an Open Source (MIT License) library for modern Delphi releases.  It includes an extremely fast and standard JSON implements as well as utilities useful when working with JSON.
 
+## Installation ##
+
+### Option A — DPM (recommended for application projects)
+
+[DPM](https://docs.delphi.dev/) (Delphi Package Manager) installs Chimera as a **source-only**
+package. DPM downloads the sources into your local package cache and adds them to the
+project search path via `$(DPMSearch)`. Nothing is registered in the IDE and no `.bpl` is
+required — units compile into your app like any other source.
+
+| | |
+|---|---|
+| **Package id** | `sivv.chimera` |
+| **Feed** | [delphi.dev](https://delphi.dev/) public gallery (registered by default on first DPM run) |
+| **Delphi versions** | 10.0 Seattle through 13.0 Florence |
+| **Installed units** | JSON, JWT/JWK, pub/sub, storage, and utility units under `src\` in the package cache |
+
+#### 1. One-time setup
+
+1. Install the [DPM client](https://docs.delphi.dev/getting-started/installing.html)
+   (command-line tool and IDE plugin). Leave **Add to PATH** enabled.
+2. Confirm a gallery source is configured:
+
+   ```text
+   dpm sources List
+   ```
+
+   You should see a source pointing at `https://delphi.dev/...` (often named `DPM` or
+   `delphi.dev`). If not:
+
+   ```text
+   dpm sources Add "-name=delphi.dev" "-source=https://delphi.dev/api/v2/index.json" -type=DPMServer
+   dpm sources Enable "-name=delphi.dev"
+   ```
+
+#### 2. Add the package to your project
+
+**From the IDE:** open your `.dproj`, right-click the project → **Manage DPM
+Packages**, search for `sivv.chimera`, and install.
+
+**From the command line** (run from any folder):
+
+```text
+dpm install sivv.chimera C:\path\to\YourProject.dproj
+```
+
+Pin a specific release:
+
+```text
+dpm install sivv.chimera -version=1.0.0 C:\path\to\YourProject.dproj
+```
+
+Limit platforms if needed (defaults to all platforms your project targets):
+
+```text
+dpm install sivv.chimera -platforms=Win32,Win64 C:\path\to\YourProject.dproj
+```
+
+#### 3. Use it in code
+
+```pascal
+uses chimera.json;              // core JSON library
+uses chimera.json.helpers;      // TObject / dataset serialization helpers
+uses chimera.json.jwt;          // JWT support
+uses chimera.json.jwk;          // JWK support
+uses chimera.pubsub;            // internal pub/sub server
+uses chimera.bayeux.client;     // Comet/Bayeux (Faye-compatible) client
+uses chimera.storage;           // storage engine
+uses chimera.utility;           // general utilities
+```
+
+Some units require optional Delphi packages (for example Indy units for
+`chimera.pubsub.client.idhttp`, `chimera.pubsub.server.idhttp`, and
+`chimera.storage.local`, or `inet` for `chimera.pubsub.producer`). Add those
+dependencies only when you use the corresponding units.
+
+#### 4. What DPM changes in your `.dproj`
+
+After install, commit the DPM-related edits to version control:
+
+- **`PackageReference`** elements at the bottom of the `.dproj` (package id + version).
+- **`$(DPMSearch)`** added to `DCC_UnitSearchPath` for each installed platform.
+
+Other developers (and CI) do **not** need a copy of this repo. After cloning your
+project:
+
+```text
+dpm restore C:\path\to\YourProject.dproj
+```
+
+That downloads the referenced package version into `%AppData%\.dpm\` and wires up the
+same search paths.
+
+#### 5. Upgrade or remove
+
+```text
+dpm install sivv.chimera -version=1.0.1 -upgrade C:\path\to\YourProject.dproj
+```
+
+Use the IDE package manager to uninstall, or edit the `PackageReference` entries and
+run `dpm restore`.
+
+#### Local / private feed
+
+If your team mirrors packages internally, register that folder or server as an
+additional DPM source and pass `-source=YourSourceName` on `install` / `restore`. The
+package spec lives at
+[`sivv.chimera.dspec.yaml`](sivv.chimera.dspec.yaml).
+
+### Option B — Manual (clone / submodule)
+
+Add this repo (or copies of the `json`, `pubsub`, `storage`, `utility`, and `common`
+folders) to your project's search path. Demo and test projects in this repo use relative
+paths so contributors can build without DPM.
+
+### Maintainers — pack and publish
+
+Tag the release first (`git tag release/1.0.0`), then:
+
+```powershell
+$env:DPM_API_KEY = 'your-api-key'
+.\scripts\publish-dpm.ps1
+```
+
+The script reads the version from the `release/*` tag at HEAD (or the latest
+`release/*` tag), packs into `dist\dpm`, and pushes to the `delphi.dev` gallery.
+Pack only: `.\scripts\publish-dpm.ps1 -PackOnly` · Push only: `-PushOnly` · See
+[`scripts/publish-dpm.ps1`](scripts/publish-dpm.ps1).
+
 # Core Features #
 
 ## JSON ##
