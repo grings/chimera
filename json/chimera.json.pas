@@ -1135,6 +1135,88 @@ end;
 procedure WriteMultiValueJSON(const Value: PMultiValue; var Writer: TJSONStreamWriter;
   Whitespace: TWhitespace; var Indent: Integer); forward;
 
+function EncodeUtf16StringToUtf8(const Text: string): TBytes;
+var
+  Src, SrcEnd: PChar;
+  Dest, DestStart: PByte;
+  W, W2: Word;
+  CodePoint: Cardinal;
+begin
+  if Text = '' then
+    Exit(nil);
+
+  SetLength(Result, (Length(Text) + 1) * 3);
+  DestStart := @Result[0];
+  Dest := DestStart;
+  Src := PChar(Text);
+  SrcEnd := Src + Length(Text);
+
+  while Src < SrcEnd do
+  begin
+    W := Word(Ord(Src^));
+    Inc(Src);
+
+    if (W < $80) and (Src < SrcEnd) and (Word(Ord(Src^)) < $80) then
+    begin
+      Dest^ := Byte(W);
+      Inc(Dest);
+      W := Word(Ord(Src^));
+      Inc(Src);
+      Dest^ := Byte(W);
+      Inc(Dest);
+      Continue;
+    end;
+
+    if W < $80 then
+    begin
+      Dest^ := Byte(W);
+      Inc(Dest);
+      Continue;
+    end;
+
+    if (W >= $D800) and (W <= $DBFF) then
+    begin
+      if Src >= SrcEnd then
+        Continue;
+      W2 := Word(Ord(Src^));
+      Inc(Src);
+      CodePoint := $10000 + ((W - $D800) shl 10) + (W2 - $DC00);
+    end
+    else
+      CodePoint := W;
+
+    if CodePoint < $800 then
+    begin
+      Dest^ := Byte($C0 or (CodePoint shr 6));
+      Inc(Dest);
+      Dest^ := Byte($80 or (CodePoint and $3F));
+      Inc(Dest);
+    end
+    else if CodePoint < $10000 then
+    begin
+      Dest^ := Byte($E0 or (CodePoint shr 12));
+      Inc(Dest);
+      Dest^ := Byte($80 or ((CodePoint shr 6) and $3F));
+      Inc(Dest);
+      Dest^ := Byte($80 or (CodePoint and $3F));
+      Inc(Dest);
+    end
+    else
+    begin
+      Dest^ := Byte($F0 or (CodePoint shr 18));
+      Inc(Dest);
+      Dest^ := Byte($80 or ((CodePoint shr 12) and $3F));
+      Inc(Dest);
+      Dest^ := Byte($80 or ((CodePoint shr 6) and $3F));
+      Inc(Dest);
+      Dest^ := Byte($80 or (CodePoint and $3F));
+      Inc(Dest);
+    end;
+  end;
+
+  SetLength(Result, NativeInt(Dest) - NativeInt(DestStart));
+end;
+
 { TJSONStreamWriter }
 
 procedure TJSONStreamWriter.Init(AStream: TStream; AWhitespace: TWhitespace);
@@ -1172,8 +1254,9 @@ begin
   FText.Clear;
   if Text = '' then
     Exit;
-  Bytes := TEncoding.UTF8.GetBytes(Text);
-  AppendData(Bytes, 0, Length(Bytes));
+  Bytes := EncodeUtf16StringToUtf8(Text);
+  if Length(Bytes) > 0 then
+    AppendData(Bytes, 0, Length(Bytes));
 end;
 
 procedure TJSONStreamWriter.AppendData(const Data: TBytes; Offset, Count: Integer);
