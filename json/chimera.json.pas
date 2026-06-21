@@ -639,7 +639,32 @@ begin
   end;
 end;
 
+const
+  JSON_STREAM_WRITER_BUFFER_SIZE = 65536;
+
 type
+  TJSONStreamWriter = record
+  private
+    FStream: TStream;
+    FWhitespace: TWhitespace;
+    FBuffer: TBytes;
+    FBufferLen: Integer;
+    FText: {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder;
+    procedure EnsureCapacity(Additional: Integer);
+    procedure FlushBytes;
+    procedure FlushText;
+    procedure AppendData(const Data: TBytes; Offset, Count: Integer);
+  public
+    procedure Init(AStream: TStream; AWhitespace: TWhitespace);
+    procedure Done;
+    procedure WriteRaw(const S: string);
+    procedure WriteChar(C: Char);
+    procedure WriteWhiteChar(C: Char);
+    procedure WriteWhiteCharAfter(C: Char);
+    procedure WriteNewLine;
+    procedure WriteIndent(Indent: Integer);
+  end;
+
   TJSONArrayImpl = class(TInterfacedObject, IJSONArray)
   private
     FUpdating: Boolean;
@@ -702,6 +727,7 @@ type
     FValues : TList<PMultiValue>;
     procedure EnsureSize(const idx : integer);
     function Clone : IJSONArray;
+    procedure WriteJSON(var Writer: TJSONStreamWriter; Whitespace: TWhitespace; var Indent: Integer);
   public // IJSONArray
 
     procedure Add(const value : PMultiValue); overload;
@@ -880,6 +906,7 @@ type
     //procedure ParentOverride(parent : IJSONObject); overload;
     function Clone(const OnTestProperty : TTestPropertyHandler = nil) : IJSONObject;
     function Compare(const Left, Right: TPair<string, PMultiValue>): Integer;
+    procedure WriteJSON(var Writer: TJSONStreamWriter; Whitespace: TWhitespace; var Indent: Integer);
   private
     FValues : TDictionary<string, PMultiValue>;
     procedure DisposeOfValue(Sender: TObject; const Item: PMultiValue; Action: TCollectionNotification);
@@ -1093,6 +1120,134 @@ begin
     TWhitespace.pretty,
     TWhitespace.sorted : Result := c+' ';
   end;
+end;
+
+procedure WriteMultiValueJSON(const Value: PMultiValue; var Writer: TJSONStreamWriter;
+  Whitespace: TWhitespace; var Indent: Integer); forward;
+
+{ TJSONStreamWriter }
+
+procedure TJSONStreamWriter.Init(AStream: TStream; AWhitespace: TWhitespace);
+begin
+  FStream := AStream;
+  FWhitespace := AWhitespace;
+  SetLength(FBuffer, JSON_STREAM_WRITER_BUFFER_SIZE);
+  FBufferLen := 0;
+  FText := {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder.Create;
+end;
+
+procedure TJSONStreamWriter.EnsureCapacity(Additional: Integer);
+begin
+  if FBufferLen + Additional > Length(FBuffer) then
+    FlushBytes;
+end;
+
+procedure TJSONStreamWriter.FlushBytes;
+begin
+  if (FBufferLen > 0) and (FStream <> nil) then
+  begin
+    FStream.Write(FBuffer[0], FBufferLen);
+    FBufferLen := 0;
+  end;
+end;
+
+procedure TJSONStreamWriter.FlushText;
+var
+  Bytes: TBytes;
+  Text: string;
+begin
+  if FText.Length = 0 then
+    Exit;
+  Text := FText.ToString;
+  FText.Clear;
+  if Text = '' then
+    Exit;
+  Bytes := TEncoding.UTF8.GetBytes(Text);
+  AppendData(Bytes, 0, Length(Bytes));
+end;
+
+procedure TJSONStreamWriter.AppendData(const Data: TBytes; Offset, Count: Integer);
+var
+  Space, CopyLen, SrcOffset, Remaining: Integer;
+begin
+  if Count <= 0 then
+    Exit;
+  SrcOffset := Offset;
+  Remaining := Count;
+  while Remaining > 0 do
+  begin
+    Space := Length(FBuffer) - FBufferLen;
+    if Space = 0 then
+    begin
+      FlushBytes;
+      Space := Length(FBuffer);
+    end;
+    CopyLen := Remaining;
+    if CopyLen > Space then
+      CopyLen := Space;
+    Move(Data[SrcOffset], FBuffer[FBufferLen], CopyLen);
+    Inc(FBufferLen, CopyLen);
+    Inc(SrcOffset, CopyLen);
+    Dec(Remaining, CopyLen);
+  end;
+end;
+
+procedure TJSONStreamWriter.Done;
+begin
+  FlushText;
+  FlushBytes;
+  FText.Free;
+  SetLength(FBuffer, 0);
+end;
+
+procedure TJSONStreamWriter.WriteRaw(const S: string);
+begin
+  if S = '' then
+    Exit;
+  FText.Append(S);
+  if FText.Length >= JSON_STREAM_WRITER_BUFFER_SIZE then
+    FlushText;
+end;
+
+procedure TJSONStreamWriter.WriteChar(C: Char);
+begin
+  FText.Append(C);
+  if FText.Length >= JSON_STREAM_WRITER_BUFFER_SIZE then
+    FlushText;
+end;
+
+procedure TJSONStreamWriter.WriteWhiteChar(C: Char);
+begin
+  case FWhitespace of
+    TWhitespace.compact:
+      WriteChar(C);
+  else
+    WriteChar(' ');
+    WriteChar(C);
+    WriteChar(' ');
+  end;
+end;
+
+procedure TJSONStreamWriter.WriteWhiteCharAfter(C: Char);
+begin
+  case FWhitespace of
+    TWhitespace.compact:
+      WriteChar(C);
+  else
+    WriteChar(C);
+    WriteChar(' ');
+  end;
+end;
+
+procedure TJSONStreamWriter.WriteNewLine;
+begin
+  WriteRaw(sLineBreak);
+end;
+
+procedure TJSONStreamWriter.WriteIndent(Indent: Integer);
+begin
+  if Indent > 0 then
+    WriteRaw(String.Create(' ', Indent));
 end;
 
 function IsValidLocalDate(Value : TDateTime) : boolean;
@@ -1635,6 +1790,42 @@ begin
     end;
   end;
   Result.Append(']');
+end;
+
+procedure TJSONArrayImpl.WriteJSON(var Writer: TJSONStreamWriter; Whitespace: TWhitespace; var Indent: Integer);
+var
+  i: Integer;
+  HasItems: Boolean;
+begin
+  Writer.WriteChar('[');
+  HasItems := False;
+
+  for i := 0 to FValues.Count - 1 do
+  begin
+    if not HasItems then
+    begin
+      if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
+      begin
+        Inc(Indent, PRETTY_PRINT_SPACING);
+        Writer.WriteNewLine;
+        Writer.WriteIndent(Indent);
+      end;
+      HasItems := True;
+    end;
+    if i > 0 then
+      Writer.WriteWhiteChar(',');
+    WriteMultiValueJSON(FValues[i], Writer, Whitespace, Indent);
+  end;
+  if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
+  begin
+    if HasItems then
+    begin
+      Writer.WriteNewLine;
+      Dec(Indent, PRETTY_PRINT_SPACING);
+      Writer.WriteIndent(Indent);
+    end;
+  end;
+  Writer.WriteChar(']');
 end;
 
 procedure TJSONArrayImpl.BeginUpdates;
@@ -3200,6 +3391,70 @@ begin
   end;
 end;
 
+procedure TJSONObject.WriteJSON(var Writer: TJSONStreamWriter; Whitespace: TWhitespace; var Indent: Integer);
+  procedure ProcessItem(const Item: TPair<string, PMultiValue>; var bFirst: Boolean);
+  begin
+    if not bFirst then
+      if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
+      begin
+        Writer.WriteChar(',');
+        Writer.WriteNewLine;
+        Writer.WriteIndent(Indent);
+      end
+      else
+        Writer.WriteWhiteCharAfter(',');
+    Writer.WriteChar('"');
+    Writer.WriteRaw(Item.Key);
+    Writer.WriteChar('"');
+    Writer.WriteWhiteChar(':');
+    WriteMultiValueJSON(Item.Value, Writer, Whitespace, Indent);
+    bFirst := False;
+  end;
+var
+  list: TList<TPair<string, PMultiValue>>;
+  item: TPair<string, PMultiValue>;
+  bFirst: Boolean;
+begin
+  if FIsSimpleValue then
+    WriteMultiValueJSON(@FSimpleValue, Writer, Whitespace, Indent)
+  else
+  begin
+    Inc(Indent, PRETTY_PRINT_SPACING);
+    Writer.WriteChar('{');
+    if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
+    begin
+      Writer.WriteNewLine;
+      Writer.WriteIndent(Indent);
+    end;
+    bFirst := True;
+
+    if Whitespace = TWhitespace.sorted then
+    begin
+      list := TList<TMultiValuePair>.Create;
+      try
+        for item in FValues do
+          list.Add(item);
+        list.Sort(Self);
+        for item in list do
+          ProcessItem(item, bFirst);
+      finally
+        list.Free;
+      end;
+    end
+    else
+      for item in FValues do
+        ProcessItem(item, bFirst);
+
+    Dec(Indent, PRETTY_PRINT_SPACING);
+    if Whitespace in [TWhitespace.pretty, TWhitespace.sorted] then
+    begin
+      Writer.WriteNewLine;
+      Writer.WriteIndent(Indent);
+    end;
+    Writer.WriteChar('}');
+  end;
+end;
+
 
 function TJSONObject.GetAsLocalDate: TDateTime;
 var
@@ -4414,9 +4669,15 @@ var
 begin
 {$IFDEF MSWINDOWS}
   if FileExists(Filename) then
+{$IFDEF MSWINDOWS}
     fs := TFileStream.Create(Filename, fmOpenWrite or fmShareDenyWrite)
   else
     fs := TFileStream.Create(Filename, fmCreate or fmShareDenyWrite);
+{$ELSE}
+    fs := TFileStream.Create(Filename, fmOpenWrite)
+  else
+    fs := TFileStream.Create(Filename, fmCreate);
+{$ENDIF}
   fs.Size := 0;
 {$ELSE}
   if FileExists(Filename) then
@@ -4435,9 +4696,15 @@ var
   fs : TFileStream;
 begin
   if FileExists(Filename) then
+{$IFDEF MSWINDOWS}
     fs := TFileStream.Create(Filename, fmOpenWrite or fmShareDenyWrite)
   else
     fs := TFileStream.Create(Filename, fmCreate or fmShareDenyWrite);
+{$ELSE}
+    fs := TFileStream.Create(Filename, fmOpenWrite)
+  else
+    fs := TFileStream.Create(Filename, fmCreate);
+{$ENDIF}
   fs.Size := 0;
   try
     SaveToStream(Name, fs, Decode);
@@ -4488,18 +4755,15 @@ end;
 
 procedure TJSONObject.SaveToStream(Stream: TStream; Whitespace : TWhitespace = TWhitespace.Standard);
 var
-  sb : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder;
-  bytes : TArray<Byte>;
-  Indent : Integer;
+  Writer: TJSONStreamWriter;
+  Indent: Integer;
 begin
-  sb := {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder.Create;
+  Writer.Init(Stream, Whitespace);
   try
     Indent := 0;
-    AsJSON(sb, Whitespace, Indent);
-    bytes := TEncoding.UTF8.GetBytes(sb.ToString);
-    Stream.Write(bytes,length(bytes));
+    WriteJSON(Writer, Whitespace, Indent);
   finally
-    sb.Free;
+    Writer.Done;
   end;
 end;
 
@@ -5138,6 +5402,58 @@ begin
         Result.Append('false');
     TJSONValueType.null:
       Result.Append('null');
+  end;
+end;
+
+procedure WriteMultiValueJSON(const Value: PMultiValue; var Writer: TJSONStreamWriter;
+  Whitespace: TWhitespace; var Indent: Integer);
+var
+  iRounded: Int64;
+begin
+  case Value.ValueType of
+    TJSONValueType.code:
+      Writer.WriteRaw(Value.StringValue);
+    TJSONValueType.&string:
+    begin
+      Writer.WriteChar('"');
+      Writer.WriteRaw(Value.StringValue);
+      Writer.WriteChar('"');
+    end;
+    TJSONValueType.number:
+    begin
+      try
+        iRounded := Round(Value.NumberValue);
+      except
+        try
+          iRounded := Trunc(Value.NumberValue);
+        except
+          iRounded := 0;
+        end;
+      end;
+
+      if (Value.NumberValue = iRounded) and
+         (Value.NumberValue <> Value.IntegerValue) then
+        Writer.WriteRaw(IntToStr(Value.IntegerValue))
+      else
+        Writer.WriteRaw(FloatToStr(Value.NumberValue));
+    end;
+    TJSONValueType.&array:
+      if Assigned(Value.ArrayValue) then
+        TJSONArrayImpl(Value.ArrayValue).WriteJSON(Writer, Whitespace, Indent)
+      else
+        Writer.WriteRaw('null');
+    TJSONValueType.&object:
+      if Assigned(Value.ObjectValue) then
+        TJSONObject(Value.ObjectValue).WriteJSON(Writer, Whitespace, Indent)
+      else
+        Writer.WriteRaw('null');
+    TJSONValueType.boolean:
+      if Value.IntegerValue = 1 then
+        Writer.WriteRaw('true')
+      else
+        Writer.WriteRaw('false');
+    TJSONValueType.null:
+      Writer.WriteRaw('null');
   end;
 end;
 
