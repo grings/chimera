@@ -1,0 +1,21 @@
+# Normalize line endings for cross-platform Delphi development.
+# RAD Studio on Windows expects CRLF in source and project files.
+* text=auto
+
+*.pas       text eol=crlf
+*.inc       text eol=crlf
+*.dproj     text eol=crlf
+*.dpk       text eol=crlf
+*.dpr       text eol=crlf
+*.dfm       text eol=crlf
+*.groupproj text eol=crlf
+
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.ps1       text eol=lf
+
+*.exe   binary
+*.dll   binary
+*.res   binary
+*.dres  binary
+*.ico   binary
