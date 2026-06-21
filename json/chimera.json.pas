@@ -608,6 +608,7 @@ uses
   System.Rtti,
   {$ENDIF}
   chimera.json.parser,
+  chimera.json.parser.builder,
   chimera.json.path,
   chimera.json.jcs,
   System.TimeSpan,
@@ -728,6 +729,10 @@ type
     procedure EnsureSize(const idx : integer);
     function Clone : IJSONArray;
     procedure WriteJSON(var Writer: TJSONStreamWriter; Whitespace: TWhitespace; var Indent: Integer);
+    procedure ParseAdd(const value : TMultiValue);
+    procedure ParseAddObject(const value : IJSONObject);
+    procedure ParseAddArray(const value : IJSONArray);
+    procedure ParseAddNull;
   public // IJSONArray
 
     procedure Add(const value : PMultiValue); overload;
@@ -916,6 +921,10 @@ type
     function GetIsNull: boolean;
     procedure SetIsNull(const Value: boolean);
     property ValueOf[const name : string] : PMultiValue read GetValueOf;
+    procedure ParseAdd(const name : string; const value : TMultiValue);
+    procedure ParseAddObject(const name : string; const value : IJSONObject);
+    procedure ParseAddArray(const name : string; const value : IJSONArray);
+    procedure ParseAddNull(const name : string);
 
     function GetAsGUID : TGuid;
     function GetAsBytes : TArray<Byte>;
@@ -1029,6 +1038,7 @@ type
     procedure EndUpdates;
 
     procedure DoChangeNotify;
+
     //function ParentArray : IJSONArray;
     //function ParentObject : IJSONObject;
 
@@ -2115,6 +2125,42 @@ procedure TJSONArrayImpl.EndUpdates;
 begin
   FUpdating := False;
   DoChangeNotify;
+end;
+
+procedure TJSONArrayImpl.ParseAdd(const value: TMultiValue);
+var
+  pmv : PMultiValue;
+begin
+  New(pmv);
+  pmv^ := value;
+  FValues.Add(pmv);
+end;
+
+procedure TJSONArrayImpl.ParseAddArray(const value: IJSONArray);
+var
+  pmv : PMultiValue;
+begin
+  New(pmv);
+  pmv.Initialize(value);
+  FValues.Add(pmv);
+end;
+
+procedure TJSONArrayImpl.ParseAddNull;
+var
+  pmv : PMultiValue;
+begin
+  New(pmv);
+  pmv.ClearToNull;
+  FValues.Add(pmv);
+end;
+
+procedure TJSONArrayImpl.ParseAddObject(const value: IJSONObject);
+var
+  pmv : PMultiValue;
+begin
+  New(pmv);
+  pmv.Initialize(value);
+  FValues.Add(pmv);
 end;
 
 procedure TJSONArrayImpl.EnsureSize(const idx: integer);
@@ -4061,6 +4107,46 @@ begin
   DoChangeNotify;
 end;
 
+procedure TJSONObject.ParseAdd(const name: string; const value: TMultiValue);
+var
+  pmv : PMultiValue;
+begin
+  FIsSimpleValue := False;
+  New(pmv);
+  pmv^ := value;
+  FValues.Add(name, pmv);
+end;
+
+procedure TJSONObject.ParseAddArray(const name: string; const value: IJSONArray);
+var
+  pmv : PMultiValue;
+begin
+  FIsSimpleValue := False;
+  New(pmv);
+  pmv.Initialize(value);
+  FValues.Add(name, pmv);
+end;
+
+procedure TJSONObject.ParseAddNull(const name: string);
+var
+  pmv : PMultiValue;
+begin
+  FIsSimpleValue := False;
+  New(pmv);
+  pmv.ClearToNull;
+  FValues.Add(name, pmv);
+end;
+
+procedure TJSONObject.ParseAddObject(const name: string; const value: IJSONObject);
+var
+  pmv : PMultiValue;
+begin
+  FIsSimpleValue := False;
+  New(pmv);
+  pmv.Initialize(value);
+  FValues.Add(name, pmv);
+end;
+
 function TJSONObject.Equals(const obj: IJSONObject): boolean;
 var
   item : TPair<string, PMultiValue>;
@@ -5478,8 +5564,80 @@ begin
   Result.&Type := AType;
 end;
 
+procedure ParserObjectBegin(const Obj: IJSONObject);
+begin
+  TJSONObject(Obj).BeginUpdates;
+end;
+
+procedure ParserObjectEnd(const Obj: IJSONObject);
+begin
+  TJSONObject(Obj).EndUpdates;
+end;
+
+procedure ParserObjectValue(const Obj: IJSONObject; const Name: string; const Value: TMultiValue);
+begin
+  TJSONObject(Obj).ParseAdd(Name, Value);
+end;
+
+procedure ParserObjectObject(const Obj: IJSONObject; const Name: string; const Value: IJSONObject);
+begin
+  TJSONObject(Obj).ParseAddObject(Name, Value);
+end;
+
+procedure ParserObjectArray(const Obj: IJSONObject; const Name: string; const Value: IJSONArray);
+begin
+  TJSONObject(Obj).ParseAddArray(Name, Value);
+end;
+
+procedure ParserObjectNull(const Obj: IJSONObject; const Name: string);
+begin
+  TJSONObject(Obj).ParseAddNull(Name);
+end;
+
+procedure ParserArrayBegin(const Arr: IJSONArray);
+begin
+  TJSONArrayImpl(Arr).BeginUpdates;
+end;
+
+procedure ParserArrayEnd(const Arr: IJSONArray);
+begin
+  TJSONArrayImpl(Arr).EndUpdates;
+end;
+
+procedure ParserArrayValue(const Arr: IJSONArray; const Value: TMultiValue);
+begin
+  TJSONArrayImpl(Arr).ParseAdd(Value);
+end;
+
+procedure ParserArrayObject(const Arr: IJSONArray; const Value: IJSONObject);
+begin
+  TJSONArrayImpl(Arr).ParseAddObject(Value);
+end;
+
+procedure ParserArrayArray(const Arr: IJSONArray; const Value: IJSONArray);
+begin
+  TJSONArrayImpl(Arr).ParseAddArray(Value);
+end;
+
+procedure ParserArrayNull(const Arr: IJSONArray);
+begin
+  TJSONArrayImpl(Arr).ParseAddNull;
+end;
+
 initialization
   FFmt := CreateENUSFormatSettings;
+  TJSONParserBuilder.ObjectBegin := ParserObjectBegin;
+  TJSONParserBuilder.ObjectEnd := ParserObjectEnd;
+  TJSONParserBuilder.ObjectValue := ParserObjectValue;
+  TJSONParserBuilder.ObjectObject := ParserObjectObject;
+  TJSONParserBuilder.ObjectArray := ParserObjectArray;
+  TJSONParserBuilder.ObjectNull := ParserObjectNull;
+  TJSONParserBuilder.ArrayBegin := ParserArrayBegin;
+  TJSONParserBuilder.ArrayEnd := ParserArrayEnd;
+  TJSONParserBuilder.ArrayValue := ParserArrayValue;
+  TJSONParserBuilder.ArrayObject := ParserArrayObject;
+  TJSONParserBuilder.ArrayArray := ParserArrayArray;
+  TJSONParserBuilder.ArrayNull := ParserArrayNull;
 
 end.
 

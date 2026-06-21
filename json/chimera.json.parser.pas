@@ -100,11 +100,12 @@ implementation
 uses
   {$IFDEF FPC}
   Character,
-  Variants;
+  Variants,
   {$ELSE}
   System.Character,
-  System.Variants;
+  System.Variants,
   {$ENDIF}
+  chimera.json.parser.builder;
 
 function CreateENUSFormatSettings : TFormatSettings;
 begin
@@ -268,48 +269,50 @@ begin
     raise EChimeraParseException.Create('Maximum JSON Depth Exceeded');
   try
     Result := TJSONArray.New;
-    GetToken;
-    while FToken <> TParseToken.CloseArray do
-    begin
-      case FToken of
-        TParser.TParseToken.&String:
-          Result.Add(PMultiValue(@FTokenValue));
-          //Result.Add(FTokenValue.StringValue);
-        TParser.TParseToken.OpenObject:
-          Result.Add(ParseObject);
-        TParser.TParseToken.OpenArray:
-          Result.Add(ParseArray);
-        TParser.TParseToken.Value:
-          case FTokenValue.ValueType of
-            TJSONValueType.&string:
-              Result.Add(FTokenValue.StringValue);
-            TJSONValueType.number:
-              Result.Add(FTokenValue.NumberValue);
-            TJSONValueType.&array:
-              Result.Add(FTokenValue.ArrayValue);
-            TJSONValueType.&object:
-              Result.Add(FTokenValue.ObjectValue);
-            TJSONValueType.boolean:
-              Result.Add(FTokenValue.IntegerValue <> 0);
-            TJSONValueType.null:
-              Result.AddNull;
-          end;
-        TParser.TParseToken.CloseObject,
-        TParser.TParseToken.CloseArray,
-        TParser.TParseToken.Comma,
-        TParser.TParseToken.EOF,
-        TParser.TParseToken.MaxOp,
-        TParser.TParseToken.Colon:
-          if FToken <> TParseToken.Colon then
-            raise EChimeraParseException.Create('Value Expected');
-      end;
+    TJSONParserBuilder.ArrayBegin(Result);
+    try
       GetToken;
-      if not (FToken in [TParseToken.Comma, TParseToken.CloseArray]) then
+      while FToken <> TParseToken.CloseArray do
       begin
-        raise EChimeraParseException.Create('Comma or Close Array Expected');
-      end;
-      if FToken = TParseToken.Comma then
+        case FToken of
+          TParser.TParseToken.&String:
+            TJSONParserBuilder.ArrayValue(Result, FTokenValue);
+          TParser.TParseToken.OpenObject:
+            TJSONParserBuilder.ArrayObject(Result, ParseObject);
+          TParser.TParseToken.OpenArray:
+            TJSONParserBuilder.ArrayArray(Result, ParseArray);
+          TParser.TParseToken.Value:
+            case FTokenValue.ValueType of
+              TJSONValueType.&string,
+              TJSONValueType.number,
+              TJSONValueType.boolean:
+                TJSONParserBuilder.ArrayValue(Result, FTokenValue);
+              TJSONValueType.&array:
+                TJSONParserBuilder.ArrayArray(Result, FTokenValue.ArrayValue);
+              TJSONValueType.&object:
+                TJSONParserBuilder.ArrayObject(Result, FTokenValue.ObjectValue);
+              TJSONValueType.null:
+                TJSONParserBuilder.ArrayNull(Result);
+            end;
+          TParser.TParseToken.CloseObject,
+          TParser.TParseToken.CloseArray,
+          TParser.TParseToken.Comma,
+          TParser.TParseToken.EOF,
+          TParser.TParseToken.MaxOp,
+          TParser.TParseToken.Colon:
+            if FToken <> TParseToken.Colon then
+              raise EChimeraParseException.Create('Value Expected');
+        end;
         GetToken;
+        if not (FToken in [TParseToken.Comma, TParseToken.CloseArray]) then
+        begin
+          raise EChimeraParseException.Create('Comma or Close Array Expected');
+        end;
+        if FToken = TParseToken.Comma then
+          GetToken;
+      end;
+    finally
+      TJSONParserBuilder.ArrayEnd(Result);
     end;
   finally
     dec(FDepth);
@@ -325,10 +328,6 @@ end;
 procedure TParser.ParseObjectTo(const Obj: IJSONObject);
 var
   sName : String;
-  {$IFDEF HASWEAKREF}
-  [Weak]
-  p : IJSONObject;
-  {$ENDIF}
 begin
   if FToken <> TParseToken.OpenObject  then
     raise EChimeraParseException.Create('Object Expected');
@@ -337,80 +336,57 @@ begin
   if FDepth >= TJSON.MaximumDepth then
     raise EChimeraParseException.Create('Maximum JSON Depth Exceeded');
   try
-    GetToken;
-    while FToken <> TParseToken.CloseObject do
-    begin
-      if FToken <> TParseToken.&String then
-        raise EChimeraParseException.Create('String Expected');
-      sName := FTokenValue.StringValue;
+    TJSONParserBuilder.ObjectBegin(Obj);
+    try
       GetToken;
-      if FToken <> TParseToken.Colon then
-        raise EChimeraParseException.Create('Colon Expected');
-      GetToken;
-      case FToken of
-        TParser.TParseToken.&String:
-          Obj.Raw[sName] := @FTokenValue;
-        TParser.TParseToken.OpenObject:
-          begin
-            {$IFDEF HASWEAKREF}
-            p := obj;
-            {$ENDIF}
-            Obj.Objects[sName] := ParseObject;
-            Obj.Objects[sName].OnChange :=
-              procedure(const jso : IJSONObject)
-              begin
-                {$IFDEF HASWEAKREF}
-                if Assigned(p) then
-                  p.DoChangeNotify;
-                {$ENDIF}
-              end;
-          end;
-        TParser.TParseToken.OpenArray:
-          begin
-            {$IFDEF HASWEAKREF}
-            p := obj;
-            {$ENDIF}
-            Obj.Arrays[sName] := ParseArray;
-            Obj.Arrays[sName].OnChange :=
-              procedure(const jsa : IJSONArray)
-              begin
-                {$IFDEF HASWEAKREF}
-                if Assigned(p) then
-                  p.DoChangeNotify;
-                {$ENDIF}
-              end;
-          end;
-        TParser.TParseToken.Value:
-          case FTokenValue.ValueType of
-            TJSONValueType.&string:
-              Obj.Strings[sName] := FTokenValue.StringValue;
-            TJSONValueType.number:
-              Obj.Numbers[sName] := FTokenValue.NumberValue;
-            TJSONValueType.&array:
-              Obj.Arrays[sName] := FTokenValue.ArrayValue;
-            TJSONValueType.&object:
-              Obj.Objects[sName] := FTokenValue.ObjectValue;
-            TJSONValueType.boolean:
-              Obj.Booleans[sName] := FTokenValue.IntegerValue <> 0;
-            TJSONValueType.null:
-              Obj.AddNull(sName);
-          end;
-        TParser.TParseToken.CloseObject,
-        TParser.TParseToken.CloseArray,
-        TParser.TParseToken.Comma,
-        TParser.TParseToken.EOF,
-        TParser.TParseToken.MaxOp,
-        TParser.TParseToken.Colon:
-          if FToken <> TParseToken.Colon then
-            raise EChimeraParseException.Create('Value Expected');
-      end;
-      GetToken;
-      if not (FToken in [TParseToken.Comma, TParseToken.CloseObject]) then
+      while FToken <> TParseToken.CloseObject do
       begin
-        raise EChimeraParseException.Create('Comma or Close Object Expected');
-      end;
-      if FToken = TParseToken.Comma then
+        if FToken <> TParseToken.&String then
+          raise EChimeraParseException.Create('String Expected');
+        sName := FTokenValue.StringValue;
         GetToken;
+        if FToken <> TParseToken.Colon then
+          raise EChimeraParseException.Create('Colon Expected');
+        GetToken;
+        case FToken of
+          TParser.TParseToken.&String:
+            TJSONParserBuilder.ObjectValue(Obj, sName, FTokenValue);
+          TParser.TParseToken.OpenObject:
+            TJSONParserBuilder.ObjectObject(Obj, sName, ParseObject);
+          TParser.TParseToken.OpenArray:
+            TJSONParserBuilder.ObjectArray(Obj, sName, ParseArray);
+          TParser.TParseToken.Value:
+            case FTokenValue.ValueType of
+              TJSONValueType.&string,
+              TJSONValueType.number,
+              TJSONValueType.boolean:
+                TJSONParserBuilder.ObjectValue(Obj, sName, FTokenValue);
+              TJSONValueType.&array:
+                TJSONParserBuilder.ObjectArray(Obj, sName, FTokenValue.ArrayValue);
+              TJSONValueType.&object:
+                TJSONParserBuilder.ObjectObject(Obj, sName, FTokenValue.ObjectValue);
+              TJSONValueType.null:
+                TJSONParserBuilder.ObjectNull(Obj, sName);
+            end;
+          TParser.TParseToken.CloseObject,
+          TParser.TParseToken.CloseArray,
+          TParser.TParseToken.Comma,
+          TParser.TParseToken.EOF,
+          TParser.TParseToken.MaxOp,
+          TParser.TParseToken.Colon:
+            if FToken <> TParseToken.Colon then
+              raise EChimeraParseException.Create('Value Expected');
+        end;
+        GetToken;
+        if not (FToken in [TParseToken.Comma, TParseToken.CloseObject]) then
+        begin
+          raise EChimeraParseException.Create('Comma or Close Object Expected');
+        end;
+        if FToken = TParseToken.Comma then
+          GetToken;
+      end;
+    finally
+      TJSONParserBuilder.ObjectEnd(Obj);
     end;
   finally
     dec(FDepth);
