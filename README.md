@@ -67,7 +67,7 @@ dpm install sivv.chimera -platforms=Win32,Win64 C:\path\to\YourProject.dproj
 uses chimera.json;              // core JSON library
 uses chimera.json.helpers;      // TObject / dataset serialization helpers
 uses chimera.json.jwt;          // JWT support
-uses chimera.json.jwk;          // JWK support
+uses chimera.json.jcs;          // RFC 8785 JSON Canonicalization Scheme (JCS)
 uses chimera.pubsub;            // internal pub/sub server
 uses chimera.bayeux.client;     // Comet/Bayeux (Faye-compatible) client
 uses chimera.storage;           // storage engine
@@ -289,6 +289,26 @@ In addition, datasets can be updated by calling UpdateFields with a JSON object 
 ```
 
 
+## JSON Canonicalization (JCS)
+
+Chimera supports [RFC 8785](https://www.rfc-editor.org/info/rfc8785) JSON Canonicalization Scheme (JCS) as an **opt-in** serializer for deterministic, hashable JSON output. Default `AsJSON` formatting is unchanged.
+
+Use `AsJCS` when you need a canonical JSON text representation, and `AsJCSBytes` when you need the UTF-8 octets for hashing or signing:
+
+```
+  var jso := JSON('{"b":2,"a":1}');
+  WriteLn(jso.AsJCS);       // {"a":1,"b":2}
+  HashBytes(jso.AsJCSBytes);
+```
+
+You can also canonicalize JSON text directly:
+
+```
+  WriteLn(JCS('{"b":2,"a":1}'));
+```
+
+`AsSHA1` and `SameAs` use Chimera's standard JSON serializer, not JCS. For interoperable digests (for example across Node, Java, or Go stacks), use `AsJCSBytes` with your preferred hash function instead.
+
 ## JWT / JWK
 
 Java Web Tokens and Java Web Keys have been a standard part of several authentication and verification schemes in today's web world.  Instantiating a JWT or JWK is very easy using the chimera.json.jwt.pas and chimera.json.jtk.pas units
@@ -321,6 +341,9 @@ JWK:
   var jwkset2 := TJWKSet.New;
   jwkset2.Add('param','value);
   send(jwkset2.AsJSON);
+  
+  // JWK thumbprint (RFC 7638) over JCS-canonical member data
+  WriteLn(jwk.Thumbprint);
 ```
 
 ## Pubsub ##

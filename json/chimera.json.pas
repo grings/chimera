@@ -210,6 +210,8 @@ type
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace; var Indent : integer); overload;
+    function AsJCS: string;
+    function AsJCSBytes: TBytes;
     {$IFNDEF FPC}
     function CreateRTLArray : System.JSON.TJSONArray;
     {$ENDIF}
@@ -415,6 +417,8 @@ type
     procedure Merge(const &object : IJSONObject; OnDuplicate : TDuplicateHandler = nil);
     function SameAs(CompareTo : IJSONObject) : boolean;
     function AsSHA1(Whitespace : TWhitespace = TWhitespace.Standard) : string;
+    function AsJCS: string;
+    function AsJCSBytes: TBytes;
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
@@ -605,6 +609,7 @@ uses
   {$ENDIF}
   chimera.json.parser,
   chimera.json.path,
+  chimera.json.jcs,
   System.TimeSpan,
   System.NetEncoding,
   System.Hash;
@@ -762,6 +767,8 @@ type
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace; var Indent : integer); overload;
+    function AsJCS: string;
+    function AsJCSBytes: TBytes;
     {$IFNDEF FPC}
     function CreateRTLArray: System.JSON.TJSONArray;
     {$ENDIF}
@@ -971,6 +978,8 @@ type
     procedure Merge(const &object : IJSONObject; OnDuplicate : TDuplicateHandler = nil);
     function SameAs(CompareTo : IJSONObject) : boolean;
     function AsSHA1(Whitespace : TWhitespace = TWhitespace.Standard) : string;
+    function AsJCS: string;
+    function AsJCSBytes: TBytes;
     function AsJSON(Whitespace : TWhitespace = TWhitespace.Standard) : string; overload;
     procedure AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard); overload;
     procedure AsJSON(Result : {$IFDEF USEFASTCODE}chimera.FastStringBuilder.{$ENDIF}TStringBuilder; Whitespace : TWhitespace = TWhitespace.standard); overload;
@@ -1482,6 +1491,16 @@ function TJSONArrayImpl.AsJSON(Whitespace : TWhitespace = TWhitespace.Standard):
 begin
   Result := '';
   AsJSON(Result, Whitespace);
+end;
+
+function TJSONArrayImpl.AsJCS: string;
+begin
+  Result := TJCSSerializer.SerializeArray(Self);
+end;
+
+function TJSONArrayImpl.AsJCSBytes: TBytes;
+begin
+  Result := TJCSSerializer.SerializeArrayBytes(Self);
 end;
 
 procedure TJSONArrayImpl.AsJSON(var Result : string; Whitespace : TWhitespace = TWhitespace.Standard);
@@ -3223,6 +3242,16 @@ begin
   LSHA2 := THashSHA1.Create;
   LSHA2.Update(TEncoding.UTF8.GetBytes(AsJSON(Whitespace)));
   Result := LSHA2.HashAsString.ToUpper;
+end;
+
+function TJSONObject.AsJCS: string;
+begin
+  Result := TJCSSerializer.SerializeObject(Self);
+end;
+
+function TJSONObject.AsJCSBytes: TBytes;
+begin
+  Result := TJCSSerializer.SerializeObjectBytes(Self);
 end;
 
 function TJSONObject.GetAsString: string;

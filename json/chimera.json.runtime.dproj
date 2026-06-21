@@ -148,6 +148,8 @@
         <DCCReference Include="chimera.json.helpers.pas"/>
         <DCCReference Include="chimera.json.jwt.pas"/>
         <DCCReference Include="chimera.json.jwk.pas"/>
+        <DCCReference Include="chimera.json.jcs.number.pas"/>
+        <DCCReference Include="chimera.json.jcs.pas"/>
         <DCCReference Include="chimera.json.path.pas"/>
         <DCCReference Include="chimera.json.path.generators.pas"/>
         <BuildConfiguration Include="Base">

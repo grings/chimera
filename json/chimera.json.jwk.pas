@@ -2,7 +2,7 @@ unit chimera.json.jwk;
 
 interface
 
-uses System.SysUtils, System.Classes, chimera.json;
+uses System.SysUtils, System.Classes, System.Hash, System.NetEncoding, chimera.json;
 
 type
   TJWK = record
@@ -74,6 +74,7 @@ type
     function Initialize : TJWK;
     class function New : TJWK; static;
     function AsJSON : string;
+    function Thumbprint: string;
   end;
 
   TJWKSet = record
@@ -92,6 +93,25 @@ type
   end;
 
 implementation
+
+function Base64UrlEncode(const Data: TBytes): string;
+var
+  Enc: TBase64Encoding;
+  I: Integer;
+begin
+  Enc := TBase64Encoding.Create(High(Integer));
+  try
+    Result := Enc.EncodeBytesToString(Data);
+  finally
+    Enc.Free;
+  end;
+  for I := 0 to Result.Length - 1 do
+    case Result.Chars[I] of
+      '/': Result[I + 1] := '_';
+      '+': Result[I + 1] := '-';
+    end;
+  Result := Result.Split(['='])[0];
+end;
 
 { TJWK }
 
@@ -118,6 +138,27 @@ end;
 function TJWK.AsJSON: string;
 begin
   Result := Data.AsJSON(TWhitespace.compact);
+end;
+
+function TJWK.Thumbprint: string;
+var
+  Canonical: IJSONObject;
+  Hash: TBytes;
+  SHA: THashSHA2;
+  I: Integer;
+const
+  ExcludedMembers: array[0..7] of string = (
+    'use', 'alg', 'key_ops', 'kid', 'x5u', 'x5c', 'x5t', 'x5t#S256'
+  );
+begin
+  Canonical := Data.Clone;
+  for I := 0 to High(ExcludedMembers) do
+    if Canonical.Has[ExcludedMembers[I]] then
+      Canonical.Remove(ExcludedMembers[I]);
+  SHA := THashSHA2.Create(THashSHA2.TSHA2Version.SHA256);
+  SHA.Update(Canonical.AsJCSBytes);
+  Hash := SHA.HashAsBytes;
+  Result := Base64UrlEncode(Hash);
 end;
 
 procedure TJWK.Add(const Name: string; Value: string);

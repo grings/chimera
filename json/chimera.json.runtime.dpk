@@ -39,6 +39,8 @@ contains
   chimera.json.helpers in 'chimera.json.helpers.pas',
   chimera.json.jwt in 'chimera.json.jwt.pas',
   chimera.json.jwk in 'chimera.json.jwk.pas',
+  chimera.json.jcs.number in 'chimera.json.jcs.number.pas',
+  chimera.json.jcs in 'chimera.json.jcs.pas',
   chimera.json.path in 'chimera.json.path.pas',
   chimera.json.path.generators in 'chimera.json.path.generators.pas';
 
