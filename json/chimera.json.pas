@@ -5200,8 +5200,8 @@ begin
     Self.StringValue := TJSON.Encode(Value)
   else
     Self.StringValue := Value;
-  Self.IntegerValue := StrToIntDef(Self.StringValue, 0);
-  Self.NumberValue := StrToFloatDef(Self.StringValue,0, FFmt);
+  Self.IntegerValue := 0;
+  Self.NumberValue := 0;
   Self.ObjectValue := nil;
   Self.ArrayValue := nil;
 end;
