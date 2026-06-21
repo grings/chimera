@@ -4412,11 +4412,17 @@ procedure TJSONObject.SaveToFile(const Filename: string; Whitespace : TWhitespac
 var
   fs : TFileStream;
 begin
+{$IFDEF MSWINDOWS}
   if FileExists(Filename) then
     fs := TFileStream.Create(Filename, fmOpenWrite or fmShareDenyWrite)
   else
     fs := TFileStream.Create(Filename, fmCreate or fmShareDenyWrite);
   fs.Size := 0;
+{$ELSE}
+  if FileExists(Filename) then
+    DeleteFile(Filename);
+  fs := TFileStream.Create(Filename, fmCreate);
+{$ENDIF}
   try
     SaveToStream(fs, Whitespace);
   finally
