@@ -563,6 +563,9 @@ type
     class function IsJSON(const str : string) : boolean;
     class function ValueToString(t : TJSONValueTYpe) : string;
 
+    class procedure EnableThreadCache;
+    class procedure DisableThreadCache;
+
     class property MaximumDepth : Cardinal read FMaximumDepth write FMaximumDepth;
   end;
 
@@ -614,6 +617,138 @@ uses
   System.TimeSpan,
   System.NetEncoding,
   System.Hash;
+
+const
+  DEFAULT_MAX_CACHED_MULTIVALUES_PER_THREAD = 65536;
+
+type
+  // Intrusive singly-linked free list of dead PMultiValue records. The
+  // "next" pointer is overlaid on the first machine word of each pooled
+  // record (the unmanaged ValueType field plus alignment padding), so no
+  // auxiliary storage is required. A record's managed references are
+  // released before being pooled, so the overlay never stomps a live
+  // managed field (StringValue/ObjectValue/ArrayValue all sit at
+  // offset >= SizeOf(Pointer)).
+  TThreadMultiValuePool = class
+  private
+    FFreeHead: PMultiValue;
+    FCount: Integer;
+    FMaxCached: Integer;
+    procedure FreeCachedNodes;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    function Acquire: PMultiValue;
+    procedure Release(P: PMultiValue);
+  end;
+
+threadvar
+  ThreadMultiValuePool: TThreadMultiValuePool;
+  // Per-thread opt-in flag, read on the hot path so a non-caching thread
+  // never has to touch (or create) its pool object to decide.
+  ThreadPoolEnabled: Boolean;
+
+function GetThreadMultiValuePool: TThreadMultiValuePool; inline;
+begin
+  if ThreadMultiValuePool = nil then
+    ThreadMultiValuePool := TThreadMultiValuePool.Create;
+  Result := ThreadMultiValuePool;
+end;
+
+function AcquireMultiValue: PMultiValue; inline;
+begin
+  if ThreadPoolEnabled then
+    Result := ThreadMultiValuePool.Acquire
+  else
+    New(Result);
+end;
+
+procedure ReleaseMultiValue(P: PMultiValue); inline;
+begin
+  if P = nil then
+    Exit;
+  if ThreadPoolEnabled then
+    ThreadMultiValuePool.Release(P)
+  else
+    Dispose(P);
+end;
+
+{ TThreadMultiValuePool }
+
+constructor TThreadMultiValuePool.Create;
+begin
+  inherited Create;
+  FFreeHead := nil;
+  FCount := 0;
+  FMaxCached := DEFAULT_MAX_CACHED_MULTIVALUES_PER_THREAD;
+end;
+
+destructor TThreadMultiValuePool.Destroy;
+begin
+  FreeCachedNodes;
+  inherited;
+end;
+
+procedure TThreadMultiValuePool.FreeCachedNodes;
+var
+  P, Next: PMultiValue;
+begin
+  P := FFreeHead;
+  while P <> nil do
+  begin
+    Next := PMultiValue(PPointer(P)^);
+    Dispose(P);
+    P := Next;
+  end;
+  FFreeHead := nil;
+  FCount := 0;
+end;
+
+function TThreadMultiValuePool.Acquire: PMultiValue;
+begin
+  Result := FFreeHead;
+  if Result <> nil then
+  begin
+    FFreeHead := PMultiValue(PPointer(Result)^);
+    Dec(FCount);
+  end
+  else
+    New(Result);
+end;
+
+procedure TThreadMultiValuePool.Release(P: PMultiValue);
+begin
+  // Release only the managed references (string + interfaces) so memory is
+  // reclaimed promptly; the unmanaged fields are left dirty since every read
+  // is type-gated and Initialize overwrites whatever it needs on reuse. The
+  // free-list link is then overlaid on the record's first (unmanaged) word.
+  P^.StringValue := '';
+  P^.ObjectValue := nil;
+  P^.ArrayValue := nil;
+  if FCount >= FMaxCached then
+    Dispose(P)
+  else
+  begin
+    PPointer(P)^ := FFreeHead;
+    FFreeHead := P;
+    Inc(FCount);
+  end;
+end;
+
+class procedure TJSON.EnableThreadCache;
+begin
+  // Ensure the pool object exists before flipping the hot-path flag so
+  // AcquireMultiValue can dereference ThreadMultiValuePool unconditionally.
+  GetThreadMultiValuePool;
+  ThreadPoolEnabled := True;
+end;
+
+class procedure TJSON.DisableThreadCache;
+begin
+  ThreadPoolEnabled := False;
+  if ThreadMultiValuePool <> nil then
+    ThreadMultiValuePool.FreeCachedNodes;
+end;
 
 // global since we don't want to add size and initialization time to TMultiValue
 var
@@ -1656,7 +1791,7 @@ procedure TJSONArrayImpl.Add(const value: double);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
 end;
@@ -1665,7 +1800,7 @@ procedure TJSONArrayImpl.Add(const value: string);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value, true);
   FValues.Add(pmv);
 end;
@@ -1674,7 +1809,7 @@ procedure TJSONArrayImpl.Add(const value: Variant);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
 end;
@@ -1683,7 +1818,7 @@ procedure TJSONArrayImpl.Add(const value: boolean);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
 end;
@@ -1692,7 +1827,7 @@ procedure TJSONArrayImpl.Add(const value: IJSONObject);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
   //value.ParentOverride(Self);
@@ -1702,7 +1837,7 @@ procedure TJSONArrayImpl.Add(const value: Int64);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
 end;
@@ -1711,7 +1846,7 @@ procedure TJSONArrayImpl.Add(const value: IJSONArray);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
   //value.ParentOverride(self);
@@ -1721,7 +1856,7 @@ procedure TJSONArrayImpl.AddNull;
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.ClearToNull;
   FValues.Add(pmv);
 end;
@@ -1730,7 +1865,7 @@ procedure TJSONArrayImpl.AddCode(const value: string);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.InitializeCode(value);
   FValues.Add(pmv);
 end;
@@ -1930,11 +2065,13 @@ procedure TJSONArrayImpl.Clear;
 var
   i: Integer;
 begin
+  // FValues (a TList) has no value-notify, so release each entry to the
+  // pool directly in a single pass before clearing the pointer list.
   for i := 0 to FValues.Count - 1 do
   begin
     if FValues[i].ObjectValue <> nil then
       FValues[i].ObjectValue.OnChange := nil;
-    Dispose(FValues[i]);
+    ReleaseMultiValue(FValues[i]);
   end;
   FValues.Clear;
 end;
@@ -2214,7 +2351,7 @@ procedure TJSONArrayImpl.ParseAdd(const value: TMultiValue);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv^ := value;
   FValues.Add(pmv);
 end;
@@ -2223,7 +2360,7 @@ procedure TJSONArrayImpl.ParseAddArray(const value: IJSONArray);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
 end;
@@ -2232,7 +2369,7 @@ procedure TJSONArrayImpl.ParseAddNull;
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.ClearToNull;
   FValues.Add(pmv);
 end;
@@ -2241,7 +2378,7 @@ procedure TJSONArrayImpl.ParseAddObject(const value: IJSONObject);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
 end;
@@ -2252,7 +2389,7 @@ var
 begin
   while FValues.Count <= idx do
   begin
-    New(pmv);
+    pmv := AcquireMultiValue;
     pmv.ClearToNull;
     FValues.Add(pmv);
   end;
@@ -2890,7 +3027,7 @@ end;
 
 procedure TJSONArrayImpl.Delete(const idx: Integer);
 begin
-  Dispose(FValues[idx]);
+  ReleaseMultiValue(FValues[idx]);
   FValues.Delete(idx);
 end;
 
@@ -2950,7 +3087,7 @@ var
   pmv : PMultiValue;
 begin
   EnsureSize(idx);
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
   //Value.ParentOverride(Self);
@@ -2962,7 +3099,7 @@ var
   pmv : PMultiValue;
 begin
   EnsureSize(idx);
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
   DoChangeNotify;
@@ -2977,7 +3114,10 @@ procedure TJSONArrayImpl.SetCount(const Value: integer);
 begin
   EnsureSize(Value);
   while FValues.Count > Value do
-    FValues.Delete(FValues.Count-1);
+  begin
+    ReleaseMultiValue(FValues[FValues.Count - 1]);
+    FValues.Delete(FValues.Count - 1);
+  end;
   DoChangeNotify;
 end;
 
@@ -2996,7 +3136,7 @@ var
   pmv : PMultiValue;
 begin
   EnsureSize(idx);
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
   DoChangeNotify;
@@ -3012,7 +3152,7 @@ var
   pmv : PMultiValue;
 begin
   EnsureSize(idx);
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
   DoChangeNotify;
@@ -3038,7 +3178,7 @@ var
   pmv : PMultiValue;
 begin
   EnsureSize(idx);
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
   //value.ParentOverride(Self);
@@ -3055,7 +3195,7 @@ var
   pmv : PMultiValue;
 begin
   EnsureSize(idx);
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
 end;
@@ -3065,7 +3205,7 @@ var
   pmv : PMultiValue;
 begin
   EnsureSize(idx);
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(TJSON.Encode(value));
   FValues.Add(pmv);
   DoChangeNotify;
@@ -3098,7 +3238,7 @@ procedure TJSONArrayImpl.Add(const value: PMultiValue);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(pmv);
   DoChangeNotify;
@@ -3319,7 +3459,7 @@ procedure TJSONObject.AddNull(const name: string);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.ClearToNull;
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
@@ -3329,7 +3469,7 @@ procedure TJSONObject.AddCode(const name, value: string);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.InitializeCode(Value);
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
@@ -3669,7 +3809,8 @@ begin
   for mv in FValues do
     if mv.Value.ObjectValue <> nil then
       mv.Value.ObjectValue.OnChange := nil;
-
+  // FValues.OnValueNotify (DisposeOfValue) routes each removed value to
+  // ReleaseMultiValue, so a single Clear pass returns them to the pool.
   FValues.Clear;
 end;
 
@@ -3987,7 +4128,7 @@ procedure TJSONObject.DisposeOfValue(Sender: TObject; const Item: PMultiValue;
   Action: TCollectionNotification);
 begin
   if Action = TCollectionNotification.cnRemoved then
-    Dispose(Item);
+    ReleaseMultiValue(Item);
 end;
 
 procedure TJSONObject.DoChangeNotify;
@@ -4195,7 +4336,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv^ := value;
   FValues.Add(name, pmv);
 end;
@@ -4205,7 +4346,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(name, pmv);
 end;
@@ -4215,7 +4356,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.ClearToNull;
   FValues.Add(name, pmv);
 end;
@@ -4225,7 +4366,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(value);
   FValues.Add(name, pmv);
 end;
@@ -4463,9 +4604,12 @@ begin
 end;
 
 function TJSONObject.GetString(const name: string): string;
+var
+  Value: PMultiValue;
 begin
-  VerifyType(ValueOf[Name].ValueType, TJSONValueType.&string);
-  Result := TJSON.Decode(ValueOf[Name].StringValue);
+  Value := ValueOf[Name];
+  VerifyType(Value.ValueType, TJSONValueType.&string);
+  Result := TJSON.Decode(Value.StringValue);
 end;
 
 function TJSONObject.GetStringDefaulted(const name: string): string;
@@ -4551,9 +4695,7 @@ end;
 
 function TJSONObject.GetValueOf(const name: string): PMultiValue;
 begin
-  if FValues.ContainsKey(name) then
-    result := FValues[name]
-  else
+  if not FValues.TryGetValue(name, Result) then
     raise EChimeraJSONException.Create('Object is missing the "'+name+'" property.');
 end;
 
@@ -4940,7 +5082,7 @@ procedure TJSONObject.SetArray(const name: string; const Value: IJSONArray);
 var
   pmv : PMultiValue;
 begin
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(Value);
   FValues.AddOrSetValue(Name, pmv);
   //value.ParentOverride(Self);
@@ -5015,7 +5157,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(Value);
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
@@ -5041,7 +5183,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(Value);
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
@@ -5057,7 +5199,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(Value);
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
@@ -5077,7 +5219,7 @@ begin
   FIsSimpleValue := False;
   if not FValues.ContainsKey(name) then
   begin
-    New(pmv);
+    pmv := AcquireMultiValue;
     pmv.Initialize(Value,true);
     FValues.AddOrSetValue(Name, pmv);
   end else
@@ -5098,7 +5240,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(Value);
   FValues.AddOrSetValue(Name, pmv);
   //value.ParentOverride(Self);
@@ -5115,7 +5257,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(Value);
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
@@ -5126,7 +5268,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(TJSON.Encode(Value));
 
   FValues.AddOrSetValue(Name, pmv);
@@ -5196,7 +5338,7 @@ var
   pmv : PMultiValue;
 begin
   FIsSimpleValue := False;
-  New(pmv);
+  pmv := AcquireMultiValue;
   pmv.Initialize(Value);
   FValues.AddOrSetValue(Name, pmv);
   DoChangeNotify;
@@ -5721,6 +5863,11 @@ initialization
   TJSONParserBuilder.ArrayObject := ParserArrayObject;
   TJSONParserBuilder.ArrayArray := ParserArrayArray;
   TJSONParserBuilder.ArrayNull := ParserArrayNull;
+  TJSON.EnableThreadCache;
+
+finalization
+  TJSON.DisableThreadCache;
+  FreeAndNil(ThreadMultiValuePool);
 
 end.
 

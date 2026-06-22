@@ -21,3 +21,4 @@ __recovery
 # DPM pack output (local feed)
 dist/dpm/
 *.dpkg
+json/OSXARM64
