@@ -170,6 +170,8 @@ begin
           ftWideString,
           ftVariant,
           ftFixedWideChar,
+          ftMemo,
+          ftFmtMemo,
           ftWideMemo:
             jso.Strings[Fields[i].FieldName] := Fields[i].AsWideString;
 
@@ -212,15 +214,14 @@ begin
             jso.Bytes[Fields[i].FieldName] := Fields[i].AsBytes;
 
           ftBlob,
-          ftMemo,
-          ftGraphic,
-          ftFmtMemo:
+          ftGraphic:
           begin
             bs := TBytesStream.Create;
             try
               TBlobField(Fields[i]).SaveToStream(bs);
               bs.Position := 0;
-              jso.Bytes[Fields[i].FieldName] := bs.Bytes;
+              // Bytes may include capacity beyond Size; only export written content.
+              jso.Bytes[Fields[i].FieldName] := Copy(bs.Bytes, 0, bs.Size);
             finally
               bs.Free;
             end;
